@@ -2,9 +2,9 @@
 
 Sprint 2, Simulated Work (AI Application Development with RAG)
 Repo: `FirstName_ClauseCheck_Kalvium-Community`
-See also: `PRD.md` (section 9.1 lists FR-1 to FR-11), `rag-architecture-design.md`, `tdd.md`, `data-sourcing.md`, `development-plan.md`
-Version: 1.0, 2026-10-01
-Status: submitted with the PRD for M1 review.
+See also: `PRD.md` (section 9.1 lists FR-1 to FR-12), `mock-ux.md`, `rag-architecture-design.md`, `tdd.md`, `data-sourcing.md`, `data-validation-report.md`, `development-plan.md`
+Version: 1.1, 2026-10-06
+Status: resubmitted with PRD v1.1 for M1 review.
 
 This document expands each functional requirement in `PRD.md` section 9.1 into **testable acceptance criteria**. The PRD says *what* each requirement is and *why*; the RAG design says *how* it is built; this document says *how we prove it is done*.
 
@@ -13,6 +13,7 @@ If this document disagrees with the PRD on scope, the PRD wins. If it disagrees 
 | Version | Date | Change | Approved by |
 |---|---|---|---|
 | 1.0 | 2026-10-01 | First version for M1 review | |
+| 1.1 | 2026-10-06 | M1 review fixes: new FR-12 (KPI cards and Insights dashboard); data-validation rules added to AC-1.8, AC-1.11, AC-4.3, AC-4.5; `client`, `topic` and clause-open logging in AC-11.2, AC-11.8 | |
 
 ---
 
@@ -31,8 +32,9 @@ If this document disagrees with the PRD on scope, the PRD wins. If it disagrees 
 11. [FR-9 Document upload](#fr-9-document-upload)
 12. [FR-10 Streaming chat UI](#fr-10-streaming-chat-ui)
 13. [FR-11 Logging, feedback and evaluation output](#fr-11-logging-feedback-and-evaluation-output)
-14. [Traceability](#14-traceability)
-15. [Open questions](#15-open-questions)
+14. [FR-12 KPI cards and Insights dashboard](#fr-12-kpi-cards-and-insights-dashboard)
+15. [Traceability](#15-traceability)
+16. [Open questions](#16-open-questions)
 
 ---
 
@@ -70,7 +72,7 @@ An FR is done when:
 
 1. every P0 criterion passes;
 2. the code is merged to `main` through a PR reviewed by someone from a different workstream;
-3. the evidence (test name, eval result file or QA record) is linked in the traceability table (section 14).
+3. the evidence (test name, eval result file or QA record) is linked in the traceability table (section 15).
 
 ### 1.5 Parameters
 
@@ -92,7 +94,8 @@ Criteria quote the **default** parameter values from `rag-architecture-design.md
 | FR-8 | Handle follow-up questions in a conversation | P0 | C (D for the sessions API) | W4 |
 | FR-9 | Upload and index new documents as background jobs | P0 | D (A for the ingestion service) | W5 |
 | FR-10 | Stream answers to a chat UI that shows sources | P0 | D | W5 |
-| FR-11 | Log queries, retrieved chunks, scores, outcomes, timings, token use and feedback | P0 (feedback P1) | D (C for eval output) | W5 |
+| FR-11 | Log queries, retrieved chunks, scores, outcomes, timings, token use, clause opens and feedback | P0 (feedback P1) | D (C for eval output) | W4–W5 |
+| FR-12 | Show five KPI cards above the fold and an Insights dashboard with charts and data tables, computed without LLM calls | P0 | D (C for eval JSON) | W5 D1–D2 |
 
 Workstreams: **A** corpus and ingestion, **B** retrieval, **C** generation and evaluation, **D** app and platform.
 
@@ -121,9 +124,10 @@ Workstreams: **A** corpus and ingestion, **B** retrieval, **C** generation and e
 | AC-1.5 | Cleaning removes repeated headers and footers, joins hyphenated line breaks and normalises whitespace, **and leaves numbers, currency symbols and clause numbering byte-for-byte unchanged**. Fixture contains `$1,250.00`, `forty-five (45)`, `Net 45`, `Section 7.2`, `A-114`; all appear unchanged after cleaning. | UT |
 | AC-1.6 | HTML is parsed with BeautifulSoup; `<script>`, `<style>`, `<nav>` and `<footer>` content does not appear in the output, and no script is executed. | UT |
 | AC-1.7 | A TXT file that is not UTF-8 (fixture in Windows-1252) is decoded through the `chardet` fallback without replacement characters in the known sentence. | UT |
-| AC-1.8 | A PDF with no text layer is not chunked. It is listed in the ingestion report as `skipped: no text layer (scanned)`. No OCR is attempted. | UT |
+| AC-1.8 | A PDF averaging under 200 characters per page is treated as having no text layer and is not chunked as PDF. For a CUAD contract, the contract is loaded instead from its `CUAD_v1.json` text through the TXT loader and listed as `pdf_fallback_to_json`; for any other source it is listed as `skipped: no text layer (scanned)`. No OCR is attempted (DV-2 in `data-validation-report.md`). | UT |
 | AC-1.9 | Re-running ingestion on an unchanged manifest skips every file whose `sha256` has not changed and creates **0** new chunks and **0** embedding calls. | IT |
 | AC-1.10 | Each ingestion run writes a report with counts per format of loaded, skipped and failed documents, plus the reason for each skip or failure. | IT |
+| AC-1.11 | Cleaning removes EDGAR page footers of the form `Source: {COMPANY}, {FORM}, {M/D/YYYY}` and stand-alone page-number lines (`12`, `- 12 -`, `Page 12 of 40`), and nothing else. Fixture: a CUAD text excerpt with three footers and three page-number lines comes out with none of them and with every clause number and amount unchanged (DV-6). | UT |
 
 ### Not covered
 
@@ -149,7 +153,7 @@ Table extraction (FR-2), chunking (FR-3), upload validation (FR-9, NFR-7), OCR (
 |---|---|---|
 | AC-2.1 | For one table fixture in each of PDF, HTML and DOCX, the extracted Markdown table has **the same number of rows and columns** as the source. | UT |
 | AC-2.2 | Every cell value in the fixtures matches the source exactly (string comparison), including currency symbols, thousands separators and ranges such as `500–999`. | UT |
-| AC-2.3 | Each table chunk has `is_table = true`, starts with the heading that precedes the table in the document, and then the header row. | UT |
+| AC-2.3 | Each table chunk has `is_table = true`, starts with the heading and caption that precede the table in the document, and then the header row. Fixture: an SLA page with two service-credit tables of different scope (region-level and instance-level) produces two chunks, each starting with its own caption (DV-11). | UT |
 | AC-2.4 | A table that exceeds `CHUNK_MAX_TOKENS` (512) is split **by rows only**; no row is split across chunks, and **every** part repeats the header row. Part IDs follow `{doc_id}::table{N}::{part}`. | UT on a 200-row fixture |
 | AC-2.5 | Every gold chunk referenced by the ~20 exact-value eval questions exists in the index after a full rebuild. `eval/run_eval.py` fails with the missing `chunk_id` if one doesn't. | EVAL (mapping check) |
 | AC-2.6 | End to end: a question about a quantity exactly on a tier boundary (e.g. 500 units where tiers are `1–499` and `500–999`) returns the price of the `500–999` tier and cites the table chunk. At least 3 boundary questions are in the eval set and all pass on the tuning split. | EVAL |
@@ -182,8 +186,8 @@ Answer wording for table values (FR-6); exact-value correctness as a whole (KPI-
 | AC-3.4 | A clause of 60–512 tokens becomes exactly one chunk. | UT |
 | AC-3.5 | A clause over `CHUNK_MAX_TOKENS` (512) is split at sentence boundaries into windows of about `CHUNK_WINDOW_TOKENS` (400) with `CHUNK_OVERLAP_TOKENS` (60) of overlap, and **every window starts with the clause heading**. | UT on a long-clause fixture |
 | AC-3.6 | No non-table chunk in the full corpus exceeds `CHUNK_MAX_TOKENS` plus the length of its repeated heading. | IT (full rebuild) |
-| AC-3.7 | A document with fewer than 3 detected headings is split into page-based chunks with the same size rules, its chunks use `p{N}` in the `chunk_id`, and the document is listed as `page_fallback` in the ingestion report. | UT |
-| AC-3.8 | `chunk_id` follows `{doc_id}::{clause_no or tableN or pN}::{part}` and is unique across the index. | IT |
+| AC-3.7 | A document with fewer than 3 detected headings is split into page-based chunks with the same size rules (TXT documents, which have no pages, are split into fixed windows of `CHUNK_WINDOW_TOKENS`), its chunks use `p{N}` (or `w{N}` for windows) in the `chunk_id`, and the document is listed as `page_fallback` in the ingestion report. Validation found this applies to about 21% of procurement-type CUAD contracts (E-04). | UT |
+| AC-3.8 | `chunk_id` follows `{doc_id}::{clause_no or tableN or pN or wN}::{part}` and is unique across the index. | IT |
 | AC-3.9 | Chunking is deterministic: two runs on the same input with the same `chunker_version` produce identical `chunk_id`s and text. | UT |
 | AC-3.10 | The ingestion report includes a chunk-size histogram, and the `chunker_version` is recorded in it and in `index_version`. | IT |
 | AC-3.11 | When `chunker_version` changes, the eval answer mapping is re-run; `eval/run_eval.py` refuses to report results if any gold `chunk_id` no longer exists (risk R-11). | EVAL |
@@ -213,13 +217,13 @@ Metadata on each chunk (FR-4); table splitting rules (FR-2).
 |---|---|---|
 | AC-4.1 | Every chunk in SQLite has these fields: `chunk_id`, `doc_id`, `supplier_id`, `doc_type`, `clause_no`, `clause_title`, `page_start`, `page_end`, `effective_date`, `expiry_date`, `parent_doc_id`, `is_table`, `has_redaction`, `is_synthetic`, `token_count`, `text`. | IT, one assertion per field |
 | AC-4.2 | Required-when rules hold for every chunk: `supplier_id`, `doc_id`, `doc_type`, `token_count`, `text` are never null; `page_start`/`page_end` are set for PDF chunks and null for HTML/TXT; `parent_doc_id` is set for amendments and points to an existing `doc_id`; `expiry_date` is set for certificates; `clause_no` is set unless the document used page fallback. | IT |
-| AC-4.3 | `has_redaction = true` if and only if the chunk text contains `[***]` (or the redaction variants listed in `data-sourcing.md`). | UT |
+| AC-4.3 | `has_redaction = true` if and only if the chunk text contains at least one of the six marker forms found in validation: `[*****]`, `[***]`, `[**]`, `[*]`, a bare `***`, or the phrase "confidential treatment" (any case). Fixture: one chunk per form is flagged; a chunk with `**bold**` Markdown or a footnote `*` is not (DV-5). | UT |
 | AC-4.4 | `is_synthetic = true` if and only if the document's `source` is `synthetic`. | IT |
-| AC-4.5 | For EDGAR documents, `effective_date` is taken from the document text, not the filing date. Fixture: an amendment filed on one date with a different effective date in its recitals stores the effective date. | UT |
+| AC-4.5 | For EDGAR documents, `effective_date` is taken from the document text, never the filing date: a calendar effective date if one is stated, otherwise the signature date in the document; if neither exists, the row is rejected with reason `no effective date`. Fixtures: (a) an amendment filed on one date with a different effective date in its recitals stores the effective date; (b) an amendment that is "effective upon full execution" stores its signature date; (c) one with neither is rejected (DV-9). | UT |
 | AC-4.6 | Chroma holds exactly the same set of `chunk_id`s as SQLite, and each Chroma record carries at least `supplier_id`, `doc_id`, `doc_type`, `clause_no`. | IT |
 | AC-4.7 | Writing one document's chunks to SQLite and Chroma is one transaction: if the Chroma write fails (simulated), no chunk of that document remains in either store. | IT |
 | AC-4.8 | After each successful write, `index_version` is recomputed as `hash(embedding_model, chunker_version, manifest_hash, upload_count)` and changes value. | IT |
-| AC-4.9 | Certificate validity is computed **in code** from `expiry_date` and `AS_OF_DATE`, never by the model. Test cases: expiry one day before, on, and one day after `AS_OF_DATE` give the expected YES/NO (boundary rule: see Q-1 in section 15). | UT |
+| AC-4.9 | Certificate validity is computed **in code** from `expiry_date` and `AS_OF_DATE`, never by the model. Test cases: expiry one day before, on, and one day after `AS_OF_DATE` give the expected YES/NO (boundary rule: see Q-1 in section 16). | UT |
 | AC-4.10 | `AS_OF_DATE` is today's date in production and a pinned date during evaluation; the pinned value is written to every eval result file. | EVAL |
 
 ### Not covered
@@ -247,7 +251,7 @@ How metadata appears in prompts and the UI (FR-6, FR-10).
 | ID | Criterion | Verified by |
 |---|---|---|
 | AC-5.1 | Resolution applies the first rule that matches, in this order: (1) sidebar filter; (2) supplier named in the question, by exact alias, else fuzzy match with `token_set_ratio ≥ SUPPLIER_FUZZY_MIN` (90); (3) carry-over from the previous turn; (4) unscoped. One test per rule, plus one where a sidebar choice overrides a different supplier named in the question. | UT |
-| AC-5.2 | Name variants resolve to one supplier: for each test supplier, its display name, short name and legal name (e.g. "Acme", "ACME Corp.", "Acme Industrial Ltd") all resolve to the same `supplier_id`. | UT |
+| AC-5.2 | Name variants resolve to one supplier: for each test supplier, its display name, short name and legal name (e.g. "Acme", "ACME Corp.", "Acme Industrial Ltd") all resolve to the same `supplier_id`. Affiliate and former names recorded during amendment pairing ("formerly known as") are aliases too. | UT |
 | AC-5.3 | The resolution method (`filter`, `alias`, `fuzzy`, `carry_over`, `unscoped`) is returned with the result and logged (FR-11). | UT |
 
 **Retrieval**
@@ -297,7 +301,7 @@ Deciding whether to answer (FR-7); context building and generation (FR-6); rewri
 |---|---|---|
 | AC-6.1 | Chunks are added to the prompt in re-ranker order, up to `CONTEXT_K` (5) chunks and `CONTEXT_TOKEN_BUDGET` (3,000) tokens. A chunk is **never truncated**: if it doesn't fit, it is skipped and the next one is tried. | UT |
 | AC-6.2 | Each chunk gets a `[C#]` marker and a header built by code with supplier, `doc_id`, `doc_type`, effective date, what it amends (if anything), clause number and title, and page (PDF only). | UT (snapshot of the built context) |
-| AC-6.3 | Header extras appear only when they apply: `standard terms (not negotiated)` for `dpa`/`sla`; `contains redacted values [***]` when `has_redaction`; `expires {date}, valid as of {AS_OF_DATE}: YES/NO` for certificates (from AC-4.9); `synthetic document` when `is_synthetic`; tables as Markdown. | UT |
+| AC-6.3 | Header extras appear only when they apply: `standard terms (not negotiated)` for `dpa`/`sla`; `contains redacted values` when `has_redaction`; `expires {date}, valid as of {AS_OF_DATE}: YES/NO` for certificates (from AC-4.9); `synthetic document` when `is_synthetic`; tables as Markdown. | UT |
 | AC-6.4 | The system prompt file starts with a version line (`# vN`), and that version is returned in the response metadata and logged. | UT |
 
 **Citation validation**
@@ -382,7 +386,7 @@ How citations and warnings are displayed (FR-10); refusal text (FR-7).
 
 ### Not covered
 
-How refusals look in the UI (FR-10, AC-10.6).
+How refusals look in the UI (FR-10, AC-10.6); how refusals are counted on the dashboard (FR-12).
 
 ---
 
@@ -424,7 +428,7 @@ Answering the rewritten question (FR-5 to FR-7 apply unchanged).
 |---|---|
 | **Requirement** | A document maintainer can upload a contract, amendment, schedule or compliance document with its supplier, type and dates; it is validated, then indexed in a background job without rebuilding the whole index. |
 | **Priority** | P0 |
-| **Stories** | US-14 |
+| **Stories** | US-14, US-20 |
 | **Features** | F-10 |
 | **Owner** | Workstream D (API, UI), Workstream A (ingestion service) |
 | **Implemented in** | `POST /documents`, `GET /documents/jobs/{job_id}`, `GET /documents`, `ingestion_service` |
@@ -448,7 +452,7 @@ Answering the rewritten question (FR-5 to FR-7 apply unchanged).
 
 ### Not covered
 
-Login and permissions for uploads (out of scope, PRD section 8.2); persistence of uploads across host restarts (risk R-08).
+Login and permissions for uploads (out of scope, PRD section 8.2); persistence of uploads across host restarts (risk R-08); opening the upload panel from the dashboard (FR-12, AC-12.11).
 
 ---
 
@@ -481,10 +485,10 @@ Login and permissions for uploads (out of scope, PRD section 8.2); persistence o
 | ID | Criterion | Verified by |
 |---|---|---|
 | AC-10.6 | Tokens render as they arrive (`st.write_stream`). If the outcome is a refusal, including `refused_no_citation` after text has streamed, the message is replaced by a grey `st.info` box with the fixed refusal text. | QA |
-| AC-10.7 | Each citation is shown as one expander with supplier, `doc_id`, document type, effective date, clause number and title, page (PDF only) and "Amends {doc_id}" for amendments. "View clause" loads the full text from `GET /chunks/{id}` on the same screen. | QA |
+| AC-10.7 | Each citation is shown as one expander with supplier, `doc_id`, document type, effective date, clause number and title, page (PDF only) and "Amends {doc_id}" for amendments. "View clause" loads the full text from `GET /chunks/{id}?query_id={query_id}` on the same screen. | QA |
 | AC-10.8 | Warnings and labels are shown with the answer: the `unsupported_number` note; "standard terms (not negotiated)"; "synthetic document"; "contains redacted values". "Not legal advice" is always visible. | QA |
 | AC-10.9 | The sidebar supplier selector is filled from `GET /suppliers` (cached 5 minutes); choosing a supplier sends it as `supplier_id` on every question. | QA |
-| AC-10.10 | The header shows document count and index status from `GET /health`. | QA |
+| AC-10.10 | The header shows document count, supplier count and index status from `GET /health`. | QA |
 | AC-10.11 | Reduced mode shows "Semantic search unavailable, using keyword search only."; when both LLMs are down, the UI shows an error with a Retry button that resends the question. | QA (mocked failures) |
 | AC-10.12 | The frontend holds only `API_BASE_URL`; no API key appears in frontend code, secrets or network responses (NFR-2). | QA, secret scan |
 | AC-10.13 | The deployed frontend and backend URLs answer a question and `/health` returns `ok` (KPI-14). | QA on W5 D3 |
@@ -498,7 +502,7 @@ Login and permissions for uploads (out of scope, PRD section 8.2); persistence o
 
 ### Not covered
 
-Thumbs up/down (FR-11, AC-11.7); dark mode and chat export (no user story, not in v1).
+Thumbs up/down (FR-11, AC-11.7); KPI cards and the Insights tab (FR-12); dark mode and chat export (no user story, not in v1).
 
 ---
 
@@ -506,12 +510,12 @@ Thumbs up/down (FR-11, AC-11.7); dark mode and chat export (no user story, not i
 
 | | |
 |---|---|
-| **Requirement** | Every question is logged with its rewritten form, supplier, retrieved chunks and scores, outcome, timings, models, versions, token use and warnings, so any wrong answer can be traced to the stage that caused it. Users can rate answers, and evaluation runs write versioned reports. |
+| **Requirement** | Every question is logged with its rewritten form, supplier, retrieved chunks and scores, outcome, timings, models, versions, token use, warnings, client and topic, so any wrong answer can be traced to the stage that caused it and the dashboard can count it. Clause opens are logged. Users can rate answers, and evaluation runs write versioned reports. |
 | **Priority** | P0 (feedback P1) |
 | **Stories** | US-15, US-16, US-18 |
 | **Features** | F-12, F-13, F-15 |
 | **Owner** | Workstream D (logging, feedback), Workstream C (eval output) |
-| **Implemented in** | `query_log`, `retrieval_log`, `feedback` tables; JSON log lines; `POST /feedback`; `scripts/usage_report.py`; `eval/run_eval.py` |
+| **Implemented in** | `query_log`, `retrieval_log`, `clause_open_log`, `feedback` tables; JSON log lines; `POST /feedback`; `scripts/usage_report.py`; `eval/run_eval.py` |
 | **Depends on** | FR-5 to FR-10 |
 
 ### Acceptance criteria
@@ -519,42 +523,85 @@ Thumbs up/down (FR-11, AC-11.7); dark mode and chat export (no user story, not i
 | ID | Criterion | Verified by |
 |---|---|---|
 | AC-11.1 | Every request to `/chat` or `/chat/stream`, **including refusals, errors and cache hits**, writes exactly **one** `query_log` row. | API |
-| AC-11.2 | Each `query_log` row contains: raw and rewritten question, `supplier_id`, `resolved_by`, `outcome`, `top_score`, `threshold`, prompt version, `index_version`, model used, `fallback_used`, `rewrite_ms`, `embed_ms`, `retrieve_ms`, `rerank_ms`, `ttft_ms`, `total_ms`, prompt and output tokens, `cache_hit`, warnings, answer and `citations_json`. | API, one assertion per field |
+| AC-11.2 | Each `query_log` row contains: raw and rewritten question, `supplier_id`, `resolved_by`, `outcome`, `top_score`, `threshold`, prompt version, `index_version`, model used, `fallback_used`, `rewrite_ms`, `embed_ms`, `retrieve_ms`, `rerank_ms`, `ttft_ms`, `total_ms`, prompt and output tokens, `cache_hit`, warnings, answer, `citations_json`, `client` (`ui`, `eval` or `api`, from the `X-Client` header; default `api`) and `topic` (AC-12.5). | API, one assertion per field |
 | AC-11.3 | Each request that ran retrieval writes one `retrieval_log` row **per candidate**, with `vector_rank`, `bm25_rank`, `rrf_score`, `rerank_score` and `sent_to_llm`. Ranks are null for a retriever that didn't return the chunk. | API |
 | AC-11.4 | Each request writes one JSON line to stdout with a request ID, stage timings, token counts and outcome. No API key or secret appears in any log line. | API, secret scan on a captured log |
 | AC-11.5 | `scripts/usage_report.py` sums token use per day and per model from the logs. | UT |
 | AC-11.6 | Using only `query_log` and `retrieval_log`, a wrong answer from the tuning split can be classified as one of: gold chunk not retrieved; retrieved but ranked low; sent but ignored; cited but misread. Shown for at least 3 wrong answers in the W4 eval report. | EVAL |
 | AC-11.7 **[cut-1]** | `POST /feedback` with `query_id`, `rating` (+1 or −1) and an optional comment saves one `feedback` row; an unknown `query_id` returns `404`. The UI shows thumbs up/down under each answer. | API, QA |
-| AC-11.8 | `eval/run_eval.py` writes `eval/results/<date>_<tag>.md` containing KPI-02 to KPI-11, the split used, `index_version`, prompt version, `chunker_version`, `RELEVANCE_THRESHOLD`, `AS_OF_DATE` and all retrieval and generation parameters. | EVAL |
+| AC-11.8 | `eval/run_eval.py` writes `eval/results/<date>_<tag>.md` **and a `.json` copy with the same numbers**, containing KPI-02 to KPI-11, the split used, `index_version`, prompt version, `chunker_version`, `RELEVANCE_THRESHOLD`, `AS_OF_DATE` and all retrieval and generation parameters. Its requests send `X-Client: eval`. | EVAL |
 | AC-11.9 | The held-out split is run once for the reported numbers; the result file records that it is the held-out run. | EVAL |
 | AC-11.10 | A 10-question smoke subset of the eval runs in CI on every merge to `main`. | CI |
 | AC-11.11 | The same question asked twice returns `cache_hit: true` with **0** LLM calls on the second request (KPI-13, NFR-5). | API |
 
 ### Not covered
 
-Dashboards over the logs (not in v1).
+Metrics computed from the logs and their display (FR-12).
 
 ---
 
-## 14. Traceability
+## FR-12 KPI cards and Insights dashboard
 
-### 14.1 Requirements to stories, features, KPIs and evidence
+| | |
+|---|---|
+| **Requirement** | The main Ask screen shows five KPI cards (K1–K5) above the fold. An Insights tab shows the same cards with period and supplier filters, four charts (outcomes per day, time to first token per day, questions by topic, documents by source and type) and four data tables (supplier activity, unanswered questions, latest eval vs targets, corpus by supplier). All values come from SQL over the logs, the index and the eval JSON, with no LLM calls. Metric definitions are in PRD section 6.4; layout and states are in `mock-ux.md` S-01 and S-13. |
+| **Priority** | P0 |
+| **Stories** | US-19, US-20, US-21 |
+| **Features** | F-16, F-17 |
+| **Owner** | Workstream D (metrics API, UI), Workstream C (eval JSON) |
+| **Implemented in** | `api/metrics.py` (`GET /metrics/summary`, `/metrics/daily`, `/metrics/breakdown`, `/metrics/unanswered`, `/metrics/eval`, `/metrics/corpus`), `rag/topics.py`, `frontend/app.py` (tabs, cards), `frontend/insights.py` (charts, tables) |
+| **Depends on** | FR-11 (logs), FR-4 (documents table), AC-11.8 (eval JSON) |
+
+### Acceptance criteria
+
+**Metrics API**
+
+| ID | Criterion | Verified by |
+|---|---|---|
+| AC-12.1 | `GET /metrics/summary?days=&supplier_id=` returns, for each of K1–K5: value, previous-window value (K1), sample size, status (`on_target`, `off_target`, `low_sample`, `no_data`), window and `data_since`. On a fixture log of 200 queries with known outcomes, timings and clause opens, every value equals an independent SQL recomputation in the test, rounded to the displayed precision (KPI-15). | API |
+| AC-12.2 | Live metrics (K1–K4, M-06 to M-10) count only rows with `client = ui`. Adding 50 `client = eval` rows to the fixture changes none of them. | API |
+| AC-12.3 | `GET /metrics/daily`, `/metrics/breakdown?by=topic`, `/metrics/breakdown?by=supplier`, `/metrics/unanswered` and `/metrics/corpus` return the rows for M-06 to M-10 and M-12 as defined in PRD 6.4; each is checked against SQL recomputation on the same fixture. `/metrics/unanswered` returns at most `limit` (default 20) rows, newest first. | API |
+| AC-12.4 | Status rules: K2 on target at ≥ 80%; K3 at ≤ 30 s; K4 at p50 < 3 s; K5 at ≥ 90%. With fewer than 20 questions in the window, K2–K4 return `low_sample`; with none, K2–K4 return `no_data` and a null value. One fixture per rule and per boundary value (79.5%, 80%, 30 s, 3.0 s, 90%). | UT |
+| AC-12.5 | `topic` is set in code by the first matching keyword group in `rag/topics.py` (payment, price, renewal, liability, termination, penalty, compliance, other), applied to the rewritten question. One test question per topic, plus one that matches two groups and gets the first. | UT |
+| AC-12.6 | `GET /chunks/{chunk_id}?query_id={query_id}` writes one `clause_open_log` row the first time any chunk is opened for that `query_id`; later opens for the same `query_id` write nothing. K3 uses the first open. Without `query_id`, nothing is logged. | API |
+| AC-12.7 | Metrics endpoints make **0** LLM and embedding calls (mock call counts), are cached for 60 s, are not counted by the rate limiter, and respond in under **2 s** at p95 with 10,000 `query_log` rows (KPI-15, NFR-1). | API, timing test |
+| AC-12.8 | `GET /metrics/eval` returns the latest tuning and held-out results from `eval/results/*.json` with each KPI's target and pass/fail; with no result files it returns an empty list, and K5 returns `no_data`. | API |
+
+**UI**
+
+| ID | Criterion | Verified by |
+|---|---|---|
+| AC-12.9 | On the Ask tab, the five cards render in one row entirely within the top 200 px of a 1366 × 768 window, before any conversation content; each shows its label, value, status in words with the target, and its sample and window, using the copy in `mock-ux.md` 9.5. Screenshot stored in `docs/qa.md`. If the metrics API fails or takes over 2 s, the cards show "Metrics unavailable" and the chat still sends and answers questions. | QA, API (mocked failure) |
+| AC-12.10 | The Insights tab shows charts M-06 (stacked by outcome in the fixed order and colours of `mock-ux.md` 10.2), M-07 (p50 and p95 lines with a dashed 3 s target rule), M-08 and M-12a, and tables M-09, M-10, M-11 and M-12b. Every chart has a title and axis titles with units; every table has the columns listed in `mock-ux.md` S-13. Empty, loading, low-sample and no-eval states match S-13b to S-13f. | QA checklist (one line per element and state) |
+| AC-12.11 | Filters: changing Period or Supplier on Insights re-queries and updates K1–K4 and M-06 to M-10, and leaves M-11 and M-12 unchanged; the Ask-tab cards stay at 7 days for all suppliers. Clicking a card on Ask opens Insights at the element in `mock-ux.md` 6.7. The M-10 row action opens the upload panel with the supplier pre-filled; it is hidden for `refused_unknown_supplier` rows. | QA |
+| AC-12.12 | In the W5 usability session, task T-11 (read whether the speed target is met without scrolling, then name the supplier with most unanswered questions) succeeds for at least 4 of 5 testers. | USE |
+
+### Not covered
+
+Contract-term portfolio analytics such as renewal timelines or liability-cap mix (out of scope, roadmap H3); exporting dashboard data (not in v1); access control for the dashboard (roadmap H4).
+
+---
+
+## 15. Traceability
+
+### 15.1 Requirements to stories, features, KPIs and evidence
 
 | FR | Stories | Features | KPIs / gates | Main evidence |
 |---|---|---|---|---|
-| FR-1 | US-11, US-14 | F-01 | KPI-12 | `tests/unit/test_loaders.py`, ingestion report |
+| FR-1 | US-11, US-14 | F-01 | KPI-12 | `tests/unit/test_loaders.py`, `tests/unit/test_cleaner.py`, ingestion report |
 | FR-2 | US-02, US-11 | F-01 | KPI-03 | `tests/unit/test_tables.py`, exact-value eval |
 | FR-3 | US-06 | F-02 | KPI-02 | `tests/unit/test_chunker.py`, histogram, chunking comparison |
-| FR-4 | US-03, US-10 | F-02, F-08 | KPI-08 | `tests/integration/test_metadata.py` |
+| FR-4 | US-03, US-10 | F-02, F-08 | KPI-08 | `tests/integration/test_metadata.py`, `tests/unit/test_redaction.py` |
 | FR-5 | US-01, US-02, US-08, US-09, US-12 | F-03, F-04 | KPI-02 **[gate]** | Recall@5, ablation table |
 | FR-6 | US-01 to US-11, US-17 | F-06, F-08 | KPI-03 **[gate]**, KPI-04 **[gate]**, KPI-08, KPI-10, KPI-11 | Citation and correctness eval, `docs/qa.md` injection test |
 | FR-7 | US-04, US-07, US-09, US-13 | F-05 | KPI-05 **[gate]**, KPI-06 **[gate]** | Refusal eval, threshold sweep |
 | FR-8 | US-05 | F-07 | KPI-09 | Follow-up pairs |
-| FR-9 | US-14 | F-10 | KPI-09 | `tests/api/test_upload.py` |
+| FR-9 | US-14, US-20 | F-10 | KPI-09 | `tests/api/test_upload.py` |
 | FR-10 | US-01, US-06, US-12, US-17 | F-09, F-11 | KPI-01, KPI-07 **[gate]**, KPI-09, KPI-14 | SSE tests, deployed TTFT, usability session |
 | FR-11 | US-15, US-16, US-18 | F-12, F-13, F-15 | KPI-11, KPI-13 | `tests/api/test_logging.py`, eval result files |
+| FR-12 | US-19, US-20, US-21 | F-16, F-17 | KPI-15, KPI-09 (T-11) | `tests/api/test_metrics.py`, `tests/unit/test_topics.py`, `docs/qa.md` screenshots |
 
-### 14.2 Acceptance gates to criteria
+### 15.2 Acceptance gates to criteria
 
 | Gate (PRD 6.2) | Criterion |
 |---|---|
@@ -565,7 +612,7 @@ Dashboards over the logs (not in v1).
 | Wrong refusals ≤ 10% | AC-7.10 |
 | TTFT p50 < 3 s | AC-10.14 |
 
-### 14.3 Cut list to criteria
+### 15.3 Cut list to criteria
 
 | Cut item (PRD 8.4) | Criteria removed if cut |
 |---|---|
@@ -575,9 +622,11 @@ Dashboards over the logs (not in v1).
 | 4. Render backup deployment | None (not a functional requirement) |
 | 5. Fixed-size vs clause-based comparison | AC-3.12 |
 
+FR-12 has no criteria on the cut list.
+
 ---
 
-## 15. Open questions
+## 16. Open questions
 
 These came up while writing testable criteria and are not settled in the PRD, TDD or RAG design. Proposed answers are ours; they need confirmation at the M1 review.
 
@@ -587,6 +636,7 @@ These came up while writing testable criteria and are not settled in the PRD, TD
 | Q-2 | Which HTTP status codes do rejected uploads return? | AC-9.2, AC-9.3 | `413` for size, `415` for file type, `422` for missing or invalid fields |
 | Q-3 | The TDD's `outcome` list has only `answered`, `refused_low_score`, `refused_unknown_supplier`, `refused_no_citation` and `error`. | AC-7.1, AC-11.2 | Add `refused_model_not_found`, `clarify_multiple_suppliers` and `out_of_scope_aggregation` to the TDD (already approved as change 3 in `rag-architecture-design.md` section 17) |
 | Q-4 | Should a failure to write a log row fail the user's request? | AC-11.1 | No: return the answer, write the error to stdout, and count it in the usage report |
+| Q-5 | Should "answered with warning" count as answered on card K2? | AC-12.1, AC-12.4 | Yes: the user got a cited answer; the warning share is visible in M-06 |
 
 ---
 
