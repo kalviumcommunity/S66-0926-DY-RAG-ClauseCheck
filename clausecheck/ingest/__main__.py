@@ -26,6 +26,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--root", type=Path, default=Path("."))
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--rebuild", action="store_true")
+    parser.add_argument(
+        "--no-embed", action="store_true", help="skip embeddings and the vector store"
+    )
     parser.add_argument("--only-supplier", metavar="ID")
     args = parser.parse_args(argv)
 
@@ -34,6 +37,19 @@ def main(argv: list[str] | None = None) -> int:
     conn = db.connect(":memory:" if args.dry_run and not db_path.exists() else db_path)
     db.init_db(conn)
     suppliers = args.suppliers if args.suppliers.exists() else None
+
+    embedder = store = None
+    if not (args.no_embed or args.dry_run):
+        from clausecheck.core.config import get_settings
+        from clausecheck.ingest.embedder import Embedder
+        from clausecheck.store.vector_store import VectorStore
+
+        settings = get_settings()
+        embedder = Embedder.from_settings(settings, conn)
+        store = VectorStore.from_settings(settings)
+        if args.rebuild:
+            store.reset()
+
     results = run_manifest(
         args.manifest,
         conn,
@@ -42,6 +58,8 @@ def main(argv: list[str] | None = None) -> int:
         rebuild=args.rebuild,
         only_supplier=args.only_supplier,
         dry_run=args.dry_run,
+        embedder=embedder,
+        vector_store=store,
     )
 
     by_status = Counter(r.status for r in results)
@@ -49,6 +67,8 @@ def main(argv: list[str] | None = None) -> int:
     for status, n in sorted(by_status.items()):
         print(f"{status:<12}{n:>10}")
     print(f"total chunks: {sum(r.n_chunks for r in results)}")
+    if store is not None:
+        print(f"vectors in {store.collection_name}: {store.count()}")
     failures = [r for r in results if r.status == "failed"]
     if failures:
         print("failures:")

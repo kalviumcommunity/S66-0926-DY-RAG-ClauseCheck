@@ -16,8 +16,11 @@ def index(
 ) -> int:
     """Upsert the document row and replace its chunks; return the number of chunks.
 
-    `embedder` and `vector_store` are accepted for the embedding PR and ignored for now.
+    With both an `embedder` and a `vector_store`, the document's vectors are replaced too.
     """
     db.upsert_document(conn, doc_row)
     db.replace_chunks(conn, doc_row["doc_id"], chunks)
+    if embedder is not None and vector_store is not None:
+        vector_store.delete_doc(doc_row["doc_id"])
+        vector_store.upsert(chunks, embedder.embed_texts([c.text for c in chunks]))
     return len(chunks)

@@ -2,6 +2,7 @@
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -25,6 +26,14 @@ class Settings(BaseSettings):
 
     # Logging
     log_level: str = "INFO"
+
+    # Embeddings and vector search
+    embed_provider: Literal["gemini", "local"] = "gemini"
+    embed_model: str = "text-embedding-004"
+    local_embed_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    embed_batch: int = 32
+    index_version: str = "v1"
+    top_k: int = 5
 
     # Chunking
     chunk_max_tokens: int = 512
