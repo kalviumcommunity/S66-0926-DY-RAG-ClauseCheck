@@ -818,3 +818,34 @@ CI runs the unit tests on every PR, and `--validate-only` on every PR that chang
 - **JavaScript-rendered vendor pages** cannot be loaded from raw HTML. The fix is sourcing (a PDF version or an archived snapshot), not parsing.
 - **Text boxes, footnotes and comments in DOCX** are not read in this sprint.
 - **Language detection** is English-only by design; a bilingual contract with a long non-English section may be rejected and would need a manual override.
+
+---
+
+## 15. Loaders and cleaner as built (PR 4)
+
+The first version in `clausecheck/ingest/` is smaller than sections 3 to 7. Where the two differ, the code follows the interfaces in the PR brief, because the tests depend on them. The rest of this document still describes the target design.
+
+**Data contracts.** `models.py` uses plain dataclasses: `Page(number, text)`, `Table(page, header, rows)`, `RawDocument`, `CleanPage` and `CleanDocument`. Pages are always numbered from 1, including HTML and TXT (section 3 uses `None` there). `CleanDocument` keeps a list of pages, not a joined text with a `page_map`. There are no issue codes yet.
+
+**Loaders (`loaders.py`).** `load(path, manifest_row)` picks the format from `manifest_row["format"]`, else from the file suffix (`htm` counts as `html`), and raises `UnsupportedFormatError` for anything else.
+
+| Format | Text | Tables |
+|---|---|---|
+| PDF | PyMuPDF text per page, in reading order | pdfplumber `extract_tables()`, first row is the header, tables with fewer than 2 rows are skipped |
+| HTML | BeautifulSoup with `lxml`; `script`, `style`, `nav`, `header` and `footer` removed; pages split on `<hr>` or form feeds, else one page | every `<table>`, first row is the header |
+| DOCX | paragraphs joined with `\n` as one page | every table, `page=1` |
+| TXT | UTF-8 with `errors="replace"`; pages split on form feeds, else one page | none |
+
+Table text is not removed from the page text, and there are no `[[TABLE:tN]]` anchors yet. A table's values therefore appear both in the page text and in its `Table`. A document with no text raises `EmptyDocumentError`, unless `manifest_row["fallback_text"]` is set, in which case that text becomes a single page (DV-2). The manifest does not carry `fallback_text`; the caller has to supply it, for CUAD from the text file in `data/raw/cuad/json_text/`.
+
+**Cleaner (`cleaner.py`).** `clean_text` runs in this order: remove footers and page-number lines, join hyphenated line breaks, unwrap single newlines, collapse spaces, strip lines.
+
+- Footers: `Source: <filer>, <form>, <M/D/YYYY>` and lines that are only a page number (`7`, `- 7 -`, `Page 7`, `Page 7 of 12`), anywhere on the page. A clause number alone on a line is therefore also removed.
+- Hyphenation: `provi-\nsions` becomes `provisions`. If the hyphen is next to a digit, or the next part starts with a capital, the hyphen stays and only the newline goes.
+- Unwrapping: a newline is kept before a numbered heading (`2.`, `2.1`, `Section 4`, `ARTICLE IV`), after a heading-only line (at most 80 characters, not ending in `.`, `;` or `,`), and around blank lines. A DOCX title followed by a plain line is joined to it.
+- Redaction: `REDACTION_PATTERNS` covers the six forms in DV-5 (`[*****]`, `[***]`, `[*]`, `***`, `[**]`, "confidential treatment") plus `[REDACTED]` and `[CONFIDENTIAL ... OMITTED]`. `clean()` detects redaction on the cleaned text, per page and for the document.
+
+Not built: character normalisation (C1), the boilerplate list, repeated header detection (C3), the protected-token check (C8), `wordfreq` hyphen rules, encoding detection and the EDGAR wrapper.
+
+**Check on the corpus.** All 146 documents in the manifest load and clean without error. 25 of the 58 CUAD contracts (43%) and 1 vendor page are flagged as redacted. The validation report found 42% of procurement-type CUAD contracts with markers.
+
