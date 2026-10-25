@@ -2,13 +2,13 @@
 
 Sprint 2, Simulated Work (AI Application Development with RAG)
 Repo: `FirstName_ClauseCheck_Kalvium-Community`
-See also: `PRD.md` (section 9.1 lists FR-1 to FR-12), `mock-ux.md`, `rag-architecture-design.md`, `tdd.md`, `data-sourcing.md`, `data-validation-report.md`, `development-plan.md`
+See also: [PRD.md](PRD.md) (section 9.1 lists FR-1 to FR-12), [mock-ux.md](../ux/mock-ux.md), [rag-architecture-design.md](../architecture/rag-architecture-design.md), [tdd.md](../architecture/tdd.md), [data-sourcing.md](../data/data-sourcing.md), [data-validation-report.md](../data/data-validation-report.md), [development-plan.md](../planning/development-plan.md)
 Version: 1.1, 2026-10-06
 Status: resubmitted with PRD v1.1 for M1 review.
 
-This document expands each functional requirement in `PRD.md` section 9.1 into **testable acceptance criteria**. The PRD says *what* each requirement is and *why*; the RAG design says *how* it is built; this document says *how we prove it is done*.
+This document expands each functional requirement in [PRD.md](PRD.md) section 9.1 into **testable acceptance criteria**. The PRD says *what* each requirement is and *why*; the RAG design says *how* it is built; this document says *how we prove it is done*.
 
-If this document disagrees with the PRD on scope, the PRD wins. If it disagrees with `rag-architecture-design.md` on a mechanism or parameter, the design wins, and this document is updated.
+If this document disagrees with the PRD on scope, the PRD wins. If it disagrees with [rag-architecture-design.md](../architecture/rag-architecture-design.md) on a mechanism or parameter, the design wins, and this document is updated.
 
 | Version | Date | Change | Approved by |
 |---|---|---|---|
@@ -76,7 +76,7 @@ An FR is done when:
 
 ### 1.5 Parameters
 
-Criteria quote the **default** parameter values from `rag-architecture-design.md` section 11 (for example `RETRIEVE_K = 20`). These live in `.env` and may change during tuning. A criterion passes if it holds for the value configured at test time, and that value is recorded in the test output or eval file.
+Criteria quote the **default** parameter values from [rag-architecture-design.md](../architecture/rag-architecture-design.md) section 11 (for example `RETRIEVE_K = 20`). These live in `.env` and may change during tuning. A criterion passes if it holds for the value configured at test time, and that value is recorded in the test output or eval file.
 
 ---
 
@@ -124,7 +124,7 @@ Workstreams: **A** corpus and ingestion, **B** retrieval, **C** generation and e
 | AC-1.5 | Cleaning removes repeated headers and footers, joins hyphenated line breaks and normalises whitespace, **and leaves numbers, currency symbols and clause numbering byte-for-byte unchanged**. Fixture contains `$1,250.00`, `forty-five (45)`, `Net 45`, `Section 7.2`, `A-114`; all appear unchanged after cleaning. | UT |
 | AC-1.6 | HTML is parsed with BeautifulSoup; `<script>`, `<style>`, `<nav>` and `<footer>` content does not appear in the output, and no script is executed. | UT |
 | AC-1.7 | A TXT file that is not UTF-8 (fixture in Windows-1252) is decoded through the `chardet` fallback without replacement characters in the known sentence. | UT |
-| AC-1.8 | A PDF averaging under 200 characters per page is treated as having no text layer and is not chunked as PDF. For a CUAD contract, the contract is loaded instead from its `CUAD_v1.json` text through the TXT loader and listed as `pdf_fallback_to_json`; for any other source it is listed as `skipped: no text layer (scanned)`. No OCR is attempted (DV-2 in `data-validation-report.md`). | UT |
+| AC-1.8 | A PDF averaging under 200 characters per page is treated as having no text layer and is not chunked as PDF. For a CUAD contract, the contract is loaded instead from its `CUAD_v1.json` text through the TXT loader and listed as `pdf_fallback_to_json`; for any other source it is listed as `skipped: no text layer (scanned)`. No OCR is attempted (DV-2 in [data-validation-report.md](../data/data-validation-report.md)). | UT |
 | AC-1.9 | Re-running ingestion on an unchanged manifest skips every file whose `sha256` has not changed and creates **0** new chunks and **0** embedding calls. | IT |
 | AC-1.10 | Each ingestion run writes a report with counts per format of loaded, skipped and failed documents, plus the reason for each skip or failure. | IT |
 | AC-1.11 | Cleaning removes EDGAR page footers of the form `Source: {COMPANY}, {FORM}, {M/D/YYYY}` and stand-alone page-number lines (`12`, `- 12 -`, `Page 12 of 40`), and nothing else. Fixture: a CUAD text excerpt with three footers and three page-number lines comes out with none of them and with every clause number and amount unchanged (DV-6). | UT |
@@ -273,7 +273,7 @@ How metadata appears in prompts and the UI (FR-6, FR-10).
 |---|---|---|
 | AC-5.12 **[gate]** | Recall@5 ≥ **0.85** on the held-out split (KPI-02). For amendment questions, the **amended** chunk must be in the top 5. | EVAL |
 | AC-5.13 | Recall@20 before re-ranking and MRR@5 are reported alongside Recall@5, so a miss can be traced to retrieval or to re-ranking. | EVAL |
-| AC-5.14 | The ablation matrix in `rag-architecture-design.md` section 12.3 (vector, BM25, hybrid, hybrid + re-rank, each with the supplier filter off and on, plus the default with amendment expansion) is run on the tuning split and reported in one table. | EVAL |
+| AC-5.14 | The ablation matrix in [rag-architecture-design.md](../architecture/rag-architecture-design.md) section 12.3 (vector, BM25, hybrid, hybrid + re-rank, each with the supplier filter off and on, plus the default with amendment expansion) is run on the tuning split and reported in one table. | EVAL |
 
 ### Not covered
 
@@ -379,7 +379,7 @@ How citations and warnings are displayed (FR-10); refusal text (FR-7).
 | AC-7.5 | `refused_model_not_found`: a model reply of exactly `NOT_FOUND` is replaced by the standard refusal and never shown to the user. | UT |
 | AC-7.6 | A refusal response has the same shape as an answer: `outcome` set to the refusal value, the fixed text in `answer`, and an empty `citations` list. | API |
 | AC-7.7 | When both LLMs are down, the response is an `error` (HTTP 503), **not** a refusal, so a failure is never presented as "not found". | API (both mocked down) |
-| AC-7.8 | `RELEVANCE_THRESHOLD` is chosen with the procedure in `rag-architecture-design.md` section 12.4 (sweep −6 to +4 in 0.5 steps on the tuning split; minimise wrong refusals subject to correct refusals ≥ 90%). The chosen value and both curves are in the eval report. | EVAL |
+| AC-7.8 | `RELEVANCE_THRESHOLD` is chosen with the procedure in [rag-architecture-design.md](../architecture/rag-architecture-design.md) section 12.4 (sweep −6 to +4 in 0.5 steps on the tuning split; minimise wrong refusals subject to correct refusals ≥ 90%). The chosen value and both curves are in the eval report. | EVAL |
 | AC-7.9 **[gate]** | Correct refusals ≥ **90%** of the ~15 unanswerable questions on the held-out split (KPI-05). | EVAL |
 | AC-7.10 **[gate]** | Wrong refusals ≤ **10%** of answerable questions on the held-out split (KPI-06). | EVAL |
 | AC-7.11 | Refusals are cached like answers (FR-11, NFR-5); errors are never cached. | API |
@@ -544,7 +544,7 @@ Metrics computed from the logs and their display (FR-12).
 
 | | |
 |---|---|
-| **Requirement** | The main Ask screen shows five KPI cards (K1–K5) above the fold. An Insights tab shows the same cards with period and supplier filters, four charts (outcomes per day, time to first token per day, questions by topic, documents by source and type) and four data tables (supplier activity, unanswered questions, latest eval vs targets, corpus by supplier). All values come from SQL over the logs, the index and the eval JSON, with no LLM calls. Metric definitions are in PRD section 6.4; layout and states are in `mock-ux.md` S-01 and S-13. |
+| **Requirement** | The main Ask screen shows five KPI cards (K1–K5) above the fold. An Insights tab shows the same cards with period and supplier filters, four charts (outcomes per day, time to first token per day, questions by topic, documents by source and type) and four data tables (supplier activity, unanswered questions, latest eval vs targets, corpus by supplier). All values come from SQL over the logs, the index and the eval JSON, with no LLM calls. Metric definitions are in PRD section 6.4; layout and states are in [mock-ux.md](../ux/mock-ux.md) S-01 and S-13. |
 | **Priority** | P0 |
 | **Stories** | US-19, US-20, US-21 |
 | **Features** | F-16, F-17 |
@@ -571,9 +571,9 @@ Metrics computed from the logs and their display (FR-12).
 
 | ID | Criterion | Verified by |
 |---|---|---|
-| AC-12.9 | On the Ask tab, the five cards render in one row entirely within the top 200 px of a 1366 × 768 window, before any conversation content; each shows its label, value, status in words with the target, and its sample and window, using the copy in `mock-ux.md` 9.5. Screenshot stored in `docs/qa.md`. If the metrics API fails or takes over 2 s, the cards show "Metrics unavailable" and the chat still sends and answers questions. | QA, API (mocked failure) |
-| AC-12.10 | The Insights tab shows charts M-06 (stacked by outcome in the fixed order and colours of `mock-ux.md` 10.2), M-07 (p50 and p95 lines with a dashed 3 s target rule), M-08 and M-12a, and tables M-09, M-10, M-11 and M-12b. Every chart has a title and axis titles with units; every table has the columns listed in `mock-ux.md` S-13. Empty, loading, low-sample and no-eval states match S-13b to S-13f. | QA checklist (one line per element and state) |
-| AC-12.11 | Filters: changing Period or Supplier on Insights re-queries and updates K1–K4 and M-06 to M-10, and leaves M-11 and M-12 unchanged; the Ask-tab cards stay at 7 days for all suppliers. Clicking a card on Ask opens Insights at the element in `mock-ux.md` 6.7. The M-10 row action opens the upload panel with the supplier pre-filled; it is hidden for `refused_unknown_supplier` rows. | QA |
+| AC-12.9 | On the Ask tab, the five cards render in one row entirely within the top 200 px of a 1366 × 768 window, before any conversation content; each shows its label, value, status in words with the target, and its sample and window, using the copy in [mock-ux.md](../ux/mock-ux.md) 9.5. Screenshot stored in `docs/qa.md`. If the metrics API fails or takes over 2 s, the cards show "Metrics unavailable" and the chat still sends and answers questions. | QA, API (mocked failure) |
+| AC-12.10 | The Insights tab shows charts M-06 (stacked by outcome in the fixed order and colours of [mock-ux.md](../ux/mock-ux.md) 10.2), M-07 (p50 and p95 lines with a dashed 3 s target rule), M-08 and M-12a, and tables M-09, M-10, M-11 and M-12b. Every chart has a title and axis titles with units; every table has the columns listed in [mock-ux.md](../ux/mock-ux.md) S-13. Empty, loading, low-sample and no-eval states match S-13b to S-13f. | QA checklist (one line per element and state) |
+| AC-12.11 | Filters: changing Period or Supplier on Insights re-queries and updates K1–K4 and M-06 to M-10, and leaves M-11 and M-12 unchanged; the Ask-tab cards stay at 7 days for all suppliers. Clicking a card on Ask opens Insights at the element in [mock-ux.md](../ux/mock-ux.md) 6.7. The M-10 row action opens the upload panel with the supplier pre-filled; it is hidden for `refused_unknown_supplier` rows. | QA |
 | AC-12.12 | In the W5 usability session, task T-11 (read whether the speed target is met without scrolling, then name the supplier with most unanswered questions) succeeds for at least 4 of 5 testers. | USE |
 
 ### Not covered
@@ -634,7 +634,7 @@ These came up while writing testable criteria and are not settled in the PRD, TD
 |---|---|---|---|
 | Q-1 | Is a certificate valid on its expiry date itself? | AC-4.9, AC-6.14 | Yes: valid while `AS_OF_DATE ≤ expiry_date` |
 | Q-2 | Which HTTP status codes do rejected uploads return? | AC-9.2, AC-9.3 | `413` for size, `415` for file type, `422` for missing or invalid fields |
-| Q-3 | The TDD's `outcome` list has only `answered`, `refused_low_score`, `refused_unknown_supplier`, `refused_no_citation` and `error`. | AC-7.1, AC-11.2 | Add `refused_model_not_found`, `clarify_multiple_suppliers` and `out_of_scope_aggregation` to the TDD (already approved as change 3 in `rag-architecture-design.md` section 17) |
+| Q-3 | The TDD's `outcome` list has only `answered`, `refused_low_score`, `refused_unknown_supplier`, `refused_no_citation` and `error`. | AC-7.1, AC-11.2 | Add `refused_model_not_found`, `clarify_multiple_suppliers` and `out_of_scope_aggregation` to the TDD (already approved as change 3 in [rag-architecture-design.md](../architecture/rag-architecture-design.md) section 17) |
 | Q-4 | Should a failure to write a log row fail the user's request? | AC-11.1 | No: return the answer, write the error to stdout, and count it in the usage report |
 | Q-5 | Should "answered with warning" count as answered on card K2? | AC-12.1, AC-12.4 | Yes: the user got a cited answer; the warning share is visible in M-06 |
 

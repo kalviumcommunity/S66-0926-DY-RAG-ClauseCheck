@@ -2,7 +2,7 @@
 
 Sprint 2, Simulated Work (AI Application Development with RAG)
 Repo: `FirstName_ClauseCheck_Kalvium-Community`
-See also: `01-project-overview.md`, `02-project-description.md`
+See also: [01-project-overview.md](../01-project-overview.md), [02-project-description.md](../02-project-description.md)
 Status: draft, waiting on design review. We start building once this is approved.
 
 This document describes how we plan to build ClauseCheck: the architecture, what each component does, how data is stored, the API, the UI, and how we deploy it. Section 18 maps each requirement from the project description (FR-1 to FR-11, NFR-1 to NFR-5) to the code that implements it. Diagrams are written in Mermaid so they render on GitHub.
@@ -1123,34 +1123,43 @@ Targets:
 ```text
 FirstName_ClauseCheck_Kalvium-Community/
 ├── README.md
-├── .env.example
+├── NOTICE                         # CUAD attribution
+├── pyproject.toml
 ├── requirements.txt
+├── .env.example
+├── .pre-commit-config.yaml
+├── .secrets.baseline
 ├── Dockerfile
 ├── .github/workflows/ci.yml
 ├── data/
 │   ├── manifest.csv
+│   ├── fetch_log.csv
 │   ├── suppliers.csv              # supplier_id, display_name, aliases
 │   ├── raw/
 │   └── uploads/
 ├── index/                         # generated, git-ignored
 ├── clausecheck/
 │   ├── core/          config.py, logging.py, ids.py
-│   ├── ingest/        loaders.py, cleaner.py, chunker.py, embedder.py, indexer.py, __main__.py
-│   ├── rag/           rewriter.py, supplier_detector.py, hybrid_retriever.py,
-│   │                  reranker.py, relevance_gate.py, generator.py, citation_validator.py
+│   ├── ingest/        models.py, loaders.py, cleaner.py, chunker.py, embedder.py,
+│   │                  indexer.py, __main__.py
+│   ├── rag/           types.py, rewriter.py, supplier_detector.py, vector_retriever.py,
+│   │                  hybrid_retriever.py, reranker.py, relevance_gate.py,
+│   │                  context_builder.py, generator.py, citation_validator.py
 │   ├── store/         vector_store.py, bm25_index.py, sqlite.py, cache.py, query_log.py
 │   ├── llm/           client.py, gemini.py, groq.py, tokens.py
-│   ├── services/      query_service.py, ingestion_service.py
-│   ├── prompts/       answer.txt, rewrite.txt, judge.txt
+│   ├── services/      query_service.py, ingestion_service.py, sessions.py
+│   ├── prompts/       loader.py, answer.txt, rewrite.txt, judge.txt
 │   └── api/           main.py, schemas.py, deps.py, routes/
 ├── frontend/
 │   ├── app.py
-│   └── components/    sidebar.py, chat.py, sources.py, sse_client.py
+│   └── components/    sidebar.py, chat.py, sources.py, insights.py, sse_client.py
 ├── scripts/
 │   ├── generate_synthetic.py      # price schedules and certificates
 │   ├── fetch_sources.py           # CUAD / EDGAR download
+│   ├── validate_cuad.py           # corpus validation
 │   ├── bootstrap.py               # restores the index on container start
 │   └── usage_report.py
+├── notebooks/                     # exploration, outputs stripped by nbstripout
 ├── eval/
 │   ├── questions.jsonl
 │   ├── run_eval.py
@@ -1163,9 +1172,16 @@ FirstName_ClauseCheck_Kalvium-Community/
 └── docs/
     ├── 01-project-overview.md
     ├── 02-project-description.md
-    ├── tdd.md
+    ├── team-charter.md
     ├── qa.md
-    └── journal/
+    ├── requirements/              # PRD.md, functional-requirements.md, non-functional-requirements.md
+    ├── planning/                  # development-plan.md, roadmap.md
+    ├── architecture/              # tdd.md, rag-architecture-design.md, api-design.md,
+    │                              # data-flow.md, ingestion-pipeline.md
+    ├── data/                      # data-sourcing.md, data-validation-report.md
+    ├── ux/                        # mock-ux.md, user-flows.md, ui-states.md
+    ├── evaluation/                # eval reports
+    └── pr-prompts/
 ```
 
 ---
@@ -1222,7 +1238,7 @@ gantt
     Deploy, docs, final eval report             :e3, 5, 1
 ```
 
-A component is done when its PR is reviewed and merged, its unit tests pass, and the related eval number is written in that day's journal.
+A component is done when its PR is reviewed and merged, its unit tests pass, and the related eval number is written in the PR description.
 
 ---
 

@@ -2,7 +2,7 @@
 
 Sprint 2, Simulated Work (AI Application Development with RAG)
 Repo: `FirstName_ClauseCheck_Kalvium-Community`
-See also: `01-project-overview.md`, `02-project-description.md`, `data-sourcing.md`, `tdd.md`
+See also: [01-project-overview.md](../01-project-overview.md), [02-project-description.md](../02-project-description.md), [data-sourcing.md](../data/data-sourcing.md), [tdd.md](tdd.md)
 
 | | |
 |---|---|
@@ -15,8 +15,8 @@ See also: `01-project-overview.md`, `02-project-description.md`, `data-sourcing.
 
 This is the master design document for ClauseCheck's Retrieval-Augmented Generation (RAG) architecture. It defines **what** the retrieval and generation system is, **why** each design choice was made, **which parameters** control it, and **how** we will prove it works. It is the single source of truth for RAG decisions: if this document and another document disagree, this one wins, and the other is updated.
 
-- `data-sourcing.md` defines the corpus that goes in.
-- `tdd.md` defines the implementation: modules, API, UI, deployment.
+- [data-sourcing.md](../data/data-sourcing.md) defines the corpus that goes in.
+- [tdd.md](tdd.md) defines the implementation: modules, API, UI, deployment.
 - **This document** defines the RAG design that connects them, and the decisions reviewers are asked to approve.
 
 Diagrams are in Mermaid so they render on GitHub.
@@ -589,7 +589,7 @@ Problem: LLMs are unreliable at date arithmetic, and "still valid" depends on to
 
 Design: **code** computes validity and puts it in the header (`valid as of 2026-10-01: YES/NO`). The model never compares dates itself. The reference date comes from `AS_OF_DATE`: today's date in production, a pinned date during eval so results are reproducible. (This resolves TDD open question 2; see decision D2.)
 
-For contracts, "current" means the latest effective amendment, not "not yet expired", because many CUAD/EDGAR agreements are years old (see `data-sourcing.md`, section 13).
+For contracts, "current" means the latest effective amendment, not "not yet expired", because many CUAD/EDGAR agreements are years old (see [data-sourcing.md](../data/data-sourcing.md), section 13).
 
 ### 9.5 Standard terms versus negotiated terms
 
@@ -656,7 +656,7 @@ All parameters live in `.env` and are loaded with `pydantic-settings`. Every val
 
 ### 12.1 Evaluation set
 
-`eval/questions.jsonl`, built as described in `data-sourcing.md`:
+`eval/questions.jsonl`, built as described in [data-sourcing.md](../data/data-sourcing.md):
 
 | Group | Count | Source of ground truth |
 |---|---|---|
@@ -705,7 +705,7 @@ Chunking is compared the same way: fixed 500-token chunks vs clause-aware chunks
 2. Sweep `RELEVANCE_THRESHOLD` from −6 to +4 in steps of 0.5.
 3. For each value compute correct refusal rate (unanswerable) and false refusal rate (answerable).
 4. Choose the value that **minimises false refusals subject to correct refusals ≥ 90%**.
-5. Plot both curves in the eval report and record the chosen value in the journal.
+5. Plot both curves in the eval report and record the chosen value in the PR description.
 6. Confirm on the held-out split.
 
 ### 12.5 Acceptance gates
@@ -826,7 +826,7 @@ This makes every wrong answer diagnosable: we can see whether the gold chunk was
 
 ## 17. Changes to the TDD draft
 
-Approving this document also approves these updates to `tdd.md`:
+Approving this document also approves these updates to [tdd.md](tdd.md):
 
 | # | Change | TDD section affected |
 |---|---|---|

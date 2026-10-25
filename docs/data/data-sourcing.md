@@ -2,9 +2,9 @@
 
 Sprint 2, Simulated Work (AI Application Development with RAG)
 Repo: `FirstName_ClauseCheck_Kalvium-Community`
-See also: `01-project-overview.md`, `02-project-description.md`, `tdd.md`, `PRD.md` (section 5), `data-validation-report.md`
+See also: [01-project-overview.md](../01-project-overview.md), [02-project-description.md](../02-project-description.md), [tdd.md](../architecture/tdd.md), [PRD.md](../requirements/PRD.md) (section 5), [data-validation-report.md](data-validation-report.md)
 Version: 1.1, 2026-10-06
-Status: resubmitted with PRD v1.1. Version 1.1 applies the findings of the field-level validation in `data-validation-report.md` (decisions DV-1 to DV-11).
+Status: resubmitted with PRD v1.1. Version 1.1 applies the findings of the field-level validation in [data-validation-report.md](data-validation-report.md) (decisions DV-1 to DV-11).
 
 This document explains where ClauseCheck's corpus comes from, why each source was chosen, how documents are selected and collected, and how each one ends up as a row in `data/manifest.csv`. It covers the three real-world sources: **CUAD**, **SEC EDGAR EX-10 exhibits**, and **public vendor DPAs / SLAs**. Synthetic price schedules and certificates are covered only briefly (section 7). Their generator is documented in `scripts/generate_synthetic.py`.
 
@@ -90,7 +90,7 @@ flowchart LR
 
 ### 4.1 What it is
 
-The **Contract Understanding Atticus Dataset (CUAD) v1** is a corpus of **510 commercial contracts** annotated by legal experts from the Atticus Project, with **more than 13,000 labels across 41 clause categories** (for example Renewal Term, Cap on Liability, Termination for Convenience, Warranty Duration). It was published by Hendrycks, Burns, Chen and Ball (NeurIPS 2021 Datasets and Benchmarks track) and is released under **CC BY 4.0**. Our validation counted 510 contracts, 41 categories and 13,823 labelled spans (`data-validation-report.md`, E-04).
+The **Contract Understanding Atticus Dataset (CUAD) v1** is a corpus of **510 commercial contracts** annotated by legal experts from the Atticus Project, with **more than 13,000 labels across 41 clause categories** (for example Renewal Term, Cap on Liability, Termination for Convenience, Warranty Duration). It was published by Hendrycks, Burns, Chen and Ball (NeurIPS 2021 Datasets and Benchmarks track) and is released under **CC BY 4.0**. Our validation counted 510 contracts, 41 categories and 13,823 labelled spans ([data-validation-report.md](data-validation-report.md), E-04).
 
 The contracts themselves were originally filed with the SEC on EDGAR, so every one is a real, signed commercial agreement. Filing dates run from 1994 to 2020.
 
@@ -418,7 +418,7 @@ After fetching, and before a document is added to the manifest, it must pass:
 | Effective date | present (5.4, 6.3) | drop |
 | Licence and URL | both recorded | row rejected by ingestion |
 
-The ingestion report (TDD 5.1) lists per-source counts, parsing failures, fallbacks, chunk counts and flagged documents. It is saved with each rebuild and summarised in the daily journal.
+The ingestion report (TDD 5.1) lists per-source counts, parsing failures, fallbacks, chunk counts and flagged documents. It is saved with each rebuild and summarised in the PR description.
 
 ---
 

@@ -2,7 +2,7 @@
  
 Sprint 2, Simulated Work (AI Application Development with RAG)
 Repo: `FirstName_ClauseCheck_Kalvium-Community`
-See also: `PRD.md` (section 5), `data-sourcing.md`, `functional-requirements.md` (FR-1, FR-4)
+See also: [PRD.md](../requirements/PRD.md) (section 5), [data-sourcing.md](data-sourcing.md), [functional-requirements.md](../requirements/functional-requirements.md) (FR-1, FR-4)
 Version: 1.0, 2026-10-06
 Status: submitted with PRD v1.1 in response to the M1 review.
  
@@ -226,7 +226,7 @@ Five candidate documents from four vendors were opened on 2026-10-06.
 | Document text | Confirmed | E-09 to E-13 | All five reachable without signing in; HTML and PDF both have text. |
 | "Last updated" date (`effective_date`) | Known issue (handled) | E-09 to E-12 | Three different wordings ("Last modified", "Last Updated", "Effective starting"); one document had none. Rule: the date parser accepts these labels; a document with no date is excluded (E-12). |
 | Service-credit tables | Known issue (handled) | E-09, E-10 | Several tables per page, each for a different scope (region vs instance, tier). Rule: each table chunk starts with its caption and the heading above it, so the scope travels with the numbers (FR-2, AC-2.3). |
-| Page type | Known issue (handled) | E-13 | Some "SLA" URLs are index pages. Rule: a document is kept only if it contains the terms themselves (selection rule 2 in `data-sourcing.md` 6.3, now checked on every candidate). |
+| Page type | Known issue (handled) | E-13 | Some "SLA" URLs are index pages. Rule: a document is kept only if it contains the terms themselves (selection rule 2 in [data-sourcing.md](data-sourcing.md) 6.3, now checked on every candidate). |
 | `retrieved_at`, `sha256`, archive URL | Confirmed | Fetch design | Written by `fetch_sources.py`; independent of page content. |
 | Standard terms label | Confirmed | E-09 to E-11 | All are published standard terms. The UI label "standard terms (not negotiated)" stays. |
  
@@ -248,17 +248,17 @@ The Atlassian DPA's effective date (August 2026) shows how recently these pages 
  
 | ID | Decision | Why | Changes |
 |---|---|---|---|
-| DV-1 | CUAD ground truth comes from `CUAD_v1.json`, not `master_clauses.csv` | The JSON has character offsets and all 13,823 were verified; the CSV has no offsets | PRD 5.2, `data-sourcing.md` 4.1, 4.5 |
-| DV-2 | CUAD TXT input is the `context` text from `CUAD_v1.json` | It is the exact text the labels point into, so gold-chunk mapping needs no fuzzy matching | PRD 5.2, `data-sourcing.md` 4.3 |
-| DV-3 | Contract type comes from the PDF folder name, normalised across `Part_I`–`Part_III` | Folder names differ between parts | `data-sourcing.md` 4.3 |
-| DV-4 | Parse both title patterns; exclude the 41 free-form titles | They can't be traced to a filing date | PRD 5.2, `data-sourcing.md` 4.3 |
+| DV-1 | CUAD ground truth comes from `CUAD_v1.json`, not `master_clauses.csv` | The JSON has character offsets and all 13,823 were verified; the CSV has no offsets | PRD 5.2, [data-sourcing.md](data-sourcing.md) 4.1, 4.5 |
+| DV-2 | CUAD TXT input is the `context` text from `CUAD_v1.json` | It is the exact text the labels point into, so gold-chunk mapping needs no fuzzy matching | PRD 5.2, [data-sourcing.md](data-sourcing.md) 4.3 |
+| DV-3 | Contract type comes from the PDF folder name, normalised across `Part_I`–`Part_III` | Folder names differ between parts | [data-sourcing.md](data-sourcing.md) 4.3 |
+| DV-4 | Parse both title patterns; exclude the 41 free-form titles | They can't be traced to a filing date | PRD 5.2, [data-sourcing.md](data-sourcing.md) 4.3 |
 | DV-5 | `has_redaction` matches six marker forms | `[***]` alone would miss most markers | PRD 5.2, 5.7; AC-4.3 |
-| DV-6 | Cleaner removes page-number lines and `Source:` footers from CUAD text | Present in 222 and 180 contracts; they would end up inside chunks | PRD 10.2; `data-sourcing.md` 11 |
-| DV-7 | Supplier target: about 100–140 suppliers in total, of which 30–50 are "deep" suppliers with 2–6 documents | 178 procurement contracts come from 106 companies; most suppliers will have one CUAD contract. Deep suppliers get the amendments, price schedules, certificates and follow-up questions | PRD 2.1, 5.1, 8.3; `data-sourcing.md` 8 |
+| DV-6 | Cleaner removes page-number lines and `Source:` footers from CUAD text | Present in 222 and 180 contracts; they would end up inside chunks | PRD 10.2; [data-sourcing.md](data-sourcing.md) 11 |
+| DV-7 | Supplier target: about 100–140 suppliers in total, of which 30–50 are "deep" suppliers with 2–6 documents | 178 procurement contracts come from 106 companies; most suppliers will have one CUAD contract. Deep suppliers get the amendments, price schedules, certificates and follow-up questions | PRD 2.1, 5.1, 8.3; [data-sourcing.md](data-sourcing.md) 8 |
 | DV-8 | CUAD `effective_date`: Effective Date label → Agreement Date label → text → drop | 171 of 178 covered by labels | PRD 5.2 |
 | DV-9 | EDGAR `effective_date`: calendar date in text → signature date → drop; never the filing date | Conditional effective dates exist (E-08) | PRD 5.3; AC-4.5 |
-| DV-10 | `parent_doc_id` points to the original; chains used only when complete for the clause | Fifth amendments and modifications of amendments exist (E-07, E-08) | PRD 5.3; `data-sourcing.md` 5.4 |
-| DV-11 | Vendor documents need a date label and must be the terms themselves; table chunks carry their caption | E-12, E-13, E-10 | PRD 5.4; `data-sourcing.md` 6.3 |
+| DV-10 | `parent_doc_id` points to the original; chains used only when complete for the clause | Fifth amendments and modifications of amendments exist (E-07, E-08) | PRD 5.3; [data-sourcing.md](data-sourcing.md) 5.4 |
+| DV-11 | Vendor documents need a date label and must be the terms themselves; table chunks carry their caption | E-12, E-13, E-10 | PRD 5.4; [data-sourcing.md](data-sourcing.md) 6.3 |
  
 ---
  
@@ -266,9 +266,9 @@ The Atlassian DPA's effective date (August 2026) shows how recently these pages 
  
 | Document | Change |
 |---|---|
-| `PRD.md` v1.1 | Section 5: every "To check" replaced with Confirmed or Known issue (handled) and an evidence ID. R-10 likelihood lowered. A-6 confirmed, A-9 partly confirmed. Validation checklist item 5 done. |
-| `data-sourcing.md` v1.1 | Paths, label source, title patterns, redaction forms, supplier target shape and amendment-chain rule updated to match this report. |
-| `functional-requirements.md` v1.1 | AC-4.3 lists the six redaction forms; AC-4.5 adds the conditional-date rule. |
+| [PRD.md](../requirements/PRD.md) v1.1 | Section 5: every "To check" replaced with Confirmed or Known issue (handled) and an evidence ID. R-10 likelihood lowered. A-6 confirmed, A-9 partly confirmed. Validation checklist item 5 done. |
+| [data-sourcing.md](data-sourcing.md) v1.1 | Paths, label source, title patterns, redaction forms, supplier target shape and amendment-chain rule updated to match this report. |
+| [functional-requirements.md](../requirements/functional-requirements.md) v1.1 | AC-4.3 lists the six redaction forms; AC-4.5 adds the conditional-date rule. |
  
 ---
  

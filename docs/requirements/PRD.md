@@ -2,16 +2,16 @@
 
 Sprint 2, Simulated Work (AI Application Development with RAG)
 Repo: `FirstName_ClauseCheck_Kalvium-Community`
-See also: `01-project-overview.md`, `02-project-description.md`, `data-sourcing.md`, `data-validation-report.md`, `mock-ux.md`, `tdd.md`, `rag-architecture-design.md`, `development-plan.md`, `roadmap.md`
+See also: [01-project-overview.md](../01-project-overview.md), [02-project-description.md](../02-project-description.md), [data-sourcing.md](../data/data-sourcing.md), [data-validation-report.md](../data/data-validation-report.md), [mock-ux.md](../ux/mock-ux.md), [tdd.md](../architecture/tdd.md), [rag-architecture-design.md](../architecture/rag-architecture-design.md), [development-plan.md](../planning/development-plan.md), [roadmap.md](../planning/roadmap.md)
 Version: 1.1, 2026-10-06
 Status: resubmitted for review (milestone M1) after the M1 review comments. We start building only after this PRD and the RAG architecture design are approved.
 
-This PRD covers what we are building and why: the problem, who it is for, what is in and out of scope, how we will measure success, and what could go wrong. How retrieval and generation work is covered in `rag-architecture-design.md`. If the two documents disagree on scope or success criteria, this one is updated first and the design follows.
+This PRD covers what we are building and why: the problem, who it is for, what is in and out of scope, how we will measure success, and what could go wrong. How retrieval and generation work is covered in [rag-architecture-design.md](../architecture/rag-architecture-design.md). If the two documents disagree on scope or success criteria, this one is updated first and the design follows.
 
 | Version | Date | Change | Approved by |
 |---|---|---|---|
 | 1.0 | 2026-10-01 | First version for M1 review | |
-| 1.1 | 2026-10-06 | M1 review fixes: (1) every dataset field validated, no "To check" left (section 5, `data-validation-report.md`); (2) KPI cards above the fold on the main screen (F-16, section 11); (3) Insights dashboard with charts and data tables (F-17, FR-12, section 6.4). Full list in section 16.3. | |
+| 1.1 | 2026-10-06 | M1 review fixes: (1) every dataset field validated, no "To check" left (section 5, [data-validation-report.md](../data/data-validation-report.md)); (2) KPI cards above the fold on the main screen (F-16, section 11); (3) Insights dashboard with charts and data tables (F-17, FR-12, section 6.4). Full list in section 16.3. | |
 
 Changes to scope (section 8), KPIs (section 6) or acceptance gates need a new version of this document and a row in the table above.
 
@@ -48,7 +48,7 @@ Changes to scope (section 8), KPIs (section 6) or acceptance gates need a new ve
 
 **How we'll know it works.** On the held-out evaluation questions at the end of week 5: recall@5 of at least 0.85, at least 85% correct answers, at least 90% correct citations, at least 90% correct refusals, no more than 10% wrong refusals, and a median time to first token under 3 seconds. In a usability session, testers should get to a checked answer in 30 seconds or less (median). Every dashboard figure must match a direct recomputation from the logs (KPI-15).
 
-**What we need.** The CUAD dataset, EDGAR amendments, public vendor DPAs and SLAs, our synthetic generator, Gemini and Groq free-tier keys, Hugging Face Spaces and Streamlit Community Cloud, and approval of this PRD (M1) and the RAG design (M2). All dataset fields were validated on 2026-10-06 (`data-validation-report.md`).
+**What we need.** The CUAD dataset, EDGAR amendments, public vendor DPAs and SLAs, our synthetic generator, Gemini and Groq free-tier keys, Hugging Face Spaces and Streamlit Community Cloud, and approval of this PRD (M1) and the RAG design (M2). All dataset fields were validated on 2026-10-06 ([data-validation-report.md](../data/data-validation-report.md)).
 
 **Main risks.** Free-tier rate limits, amendments not being retrieved (so an old term is returned), the refusal threshold overfitting our eval set, a corpus that is easier than a real company's, and dashboard numbers being misread when samples are small. All are in section 12, and the assumptions behind them are in section 13.
 
@@ -67,7 +67,7 @@ Changes to scope (section 8), KPIs (section 6) or acceptance gates need a new ve
 | Success criteria | All six acceptance gates in section 6.2 met on the held-out split by W5 D4, plus a median time to checked answer of 30 s or less and at least 80% task success in the W5 usability session (KPI-01, KPI-09). |
 | Boundary | Questions about one supplier's terms in the indexed documents. Portfolio questions such as "which suppliers auto-renew next quarter?" are not part of v1. |
 
-The supplier count reflects what the data validation found: the 178 procurement-type CUAD contracts come from 106 different companies, so most suppliers have one contract, and the amendments, price schedules and certificates are concentrated on 30 to 50 key suppliers (decision DV-7 in `data-validation-report.md`).
+The supplier count reflects what the data validation found: the 178 procurement-type CUAD contracts come from 106 different companies, so most suppliers have one contract, and the amendments, price schedules and certificates are concentrated on 30 to 50 key suppliers (decision DV-7 in [data-validation-report.md](../data/data-validation-report.md)).
 
 ### 2.2 Why it's hard
 
@@ -170,15 +170,15 @@ These are worked examples on made-up inputs, not figures for a real company. The
 
 ### 4.4 Why now
 
-- This is the problem assigned in the sprint brief, and the corpus plan in `data-sourcing.md` is ready and validated (`data-validation-report.md`).
+- This is the problem assigned in the sprint brief, and the corpus plan in [data-sourcing.md](../data/data-sourcing.md) is ready and validated ([data-validation-report.md](../data/data-validation-report.md)).
 - Everything we need (embeddings, hybrid search, a small re-ranker, Streamlit charts) is available on free tiers, so we can build it in five weeks without paying for licences.
-- The roadmap (`roadmap.md`, Part B) builds portfolio questions and renewal/expiry alerts on top of v1, using the same citations.
+- The roadmap ([roadmap.md](../planning/roadmap.md), Part B) builds portfolio questions and renewal/expiry alerts on top of v1, using the same citations.
 
 ---
 
 ## 5. Data sources
 
-Every field below was validated on 2026-10-06 against the actual data or the source's published file listing. The checks, numbers and evidence IDs (`E-##`) are in `data-validation-report.md`. Each field has one of two statuses:
+Every field below was validated on 2026-10-06 against the actual data or the source's published file listing. The checks, numbers and evidence IDs (`E-##`) are in [data-validation-report.md](../data/data-validation-report.md). Each field has one of two statuses:
 
 - **Confirmed**: checked on the data, with the result recorded.
 - **Known issue (handled)**: checked, a problem was found, and a fixed ingestion rule handles it. Decisions made because of a finding are numbered `DV-#`.
@@ -642,13 +642,13 @@ flowchart TB
 | Number check | Numbers that aren't in the cited clause (shown as a warning) |
 | Visible sources | Anything else: the user can open the clause |
 
-The full design is in `rag-architecture-design.md`, sections 6 to 8 and 11.
+The full design is in [rag-architecture-design.md](../architecture/rag-architecture-design.md), sections 6 to 8 and 11.
 
 ---
 
 ## 11. UI layout and states
 
-The full mock, with every screen, state, flow and string, is in `mock-ux.md` (v1.1). This section is the summary.
+The full mock, with every screen, state, flow and string, is in [mock-ux.md](../ux/mock-ux.md) (v1.1). This section is the summary.
 
 ### 11.1 Main screen ("Ask" tab) with KPI cards above the fold
 
@@ -760,7 +760,7 @@ Values are made up. Clicking a card opens the Insights tab scrolled to the chart
 | R-07 | Our corpus is easier than a real company's because suppliers are so different | High | Medium: our numbers look better than they would be in practice | Stated as a limitation; report the no-filter comparison as the harder case | C | Comparison table |
 | R-08 | Free host wipes its disk on restart | High | Low for the index, medium for uploads and logs | Index zip built in CI and restored at startup; UI warns about uploads; dashboard shows "data since" | D | `/health` after a restart |
 | R-09 | Time to first token over 3 s when deployed | Medium | Medium: KPI-07 missed | In order: lower `RETRIEVE_K` from 20 to 12; skip the rewrite when the supplier is named; send sources first | D | Measurement on W5 D3; card K4 |
-| R-10 | A dataset field turns out missing or wrong | Low (was Medium; all fields validated on 2026-10-06) | High: features planned on data we don't have | Field-level validation done (`data-validation-report.md`); `validate_cuad.py` re-runs in CI; `fetch_sources.py --check` before each weekly review | A | CI failure; validation report |
+| R-10 | A dataset field turns out missing or wrong | Low (was Medium; all fields validated on 2026-10-06) | High: features planned on data we don't have | Field-level validation done ([data-validation-report.md](../data/data-validation-report.md)); `validate_cuad.py` re-runs in CI; `fetch_sources.py --check` before each weekly review | A | CI failure; validation report |
 | R-11 | Chunker changes break the eval answer mapping | Medium | Medium: eval numbers quietly wrong | Re-run the mapping on every chunker change; chunker version in every result file | C | Eval script checks every answer chunk exists |
 | R-12 | Instructions hidden in an uploaded document | Low | Medium: answer manipulated | Context blocks clearly marked; prompt says to ignore instructions in documents; number check; fixed refusal text | C, D | Injection test in `docs/qa.md` |
 | R-13 | Vendor page changes or is taken down | Medium | Low | Hash, fetch date and archive link stored; changes reported, never replaced silently | A | `fetch_sources.py --check` |
@@ -812,7 +812,7 @@ An assumption is something we believe but haven't confirmed. The linked risk is 
 | Approval | By | Evidence | Due | Blocks |
 |---|---|---|---|---|
 | PRD and mock UX | Sprint mentor | Sign-off table in 17.3 | W1 D5 (M1); resubmitted 2026-10-06 | Final scope and KPIs |
-| RAG architecture design | Sprint mentor | Sign-off in `rag-architecture-design.md` section 0.2 | W2 D1 (M2) | All build work |
+| RAG architecture design | Sprint mentor | Sign-off in [rag-architecture-design.md](../architecture/rag-architecture-design.md) section 0.2 | W2 D1 (M2) | All build work |
 | Final acceptance | Sprint mentor | Held-out eval report meeting section 6.2 | W5 D5 (M7) | Submission |
 
 ### 14.3 Timeline
@@ -825,7 +825,7 @@ An assumption is something we believe but haven't confirmed. The linked risk is 
 | 4. Grounded generation | W4 | Cited answers, refusals, follow-ups; `client`, `topic` and clause-open logging | KPI-03 to KPI-06 met on tuning | M5 (W4 D5) |
 | 5. App and delivery | W5 | Metrics API, KPI cards and Insights dashboard (D1–D2); API, UI, deployment, final eval | KPI-15 passes (D2); all gates met on held-out; app live | M6 (W5 D3), M7 (W5 D5) |
 
-Day-by-day tasks are in `development-plan.md`.
+Day-by-day tasks are in [development-plan.md](../planning/development-plan.md).
 
 ---
 
@@ -839,19 +839,19 @@ Status as of this version.
 | 2 | Does every KPI have a numeric target, method and timeline? | Done | 6.1, 6.4 |
 | 3 | Are all stakeholders named with roles and ownership? | Done | 3.1, 3.2 |
 | 4 | Is the primary user clearly defined with a specific use case? | Done | P1; US-01, US-02 |
-| 5 | Has the dataset been confirmed with the data team? | **Done**: 30 fields validated on 2026-10-06; 0 left "To check" | 5, `data-validation-report.md` |
+| 5 | Has the dataset been confirmed with the data team? | **Done**: 30 fields validated on 2026-10-06; 0 left "To check" | 5, [data-validation-report.md](../data/data-validation-report.md) |
 | 6 | Does every user story follow role + action + business benefit? | Done | 7.2 |
 | 7 | Is v1 scope bounded with an out-of-scope list? | Done | 8.1 to 8.5 |
 | 8 | Is the data workflow documented end to end? | Done | 10 |
 | 9 | Are all assumptions documented as risks? | Done | 13, linked to 12 |
-| 10 | Is a wireframe or layout plan included? | Done | 11, `mock-ux.md` |
+| 10 | Is a wireframe or layout plan included? | Done | 11, [mock-ux.md](../ux/mock-ux.md) |
 | 11 | Is the PRD free of vague language ("should", "might", "probably")? | Done | Requirements use measurable criteria; see 18.2 |
 | 12 | Has AI-assisted review been done and the gaps fixed? | Done (two passes) | 16 |
 | 13 | Are naming and formatting consistent? | Done | 18.2 |
 | 14 | Has a stakeholder alignment review been done? | M1 review held; comments addressed in v1.1; awaiting sign-off | 16.3, 17 |
 | 15 | Can a non-technical reader understand what this is for? | Done | 1, 2, 4, glossary in 18.3 |
-| 16 | Does the main screen show distinct KPI cards above the fold? | **Done**: five cards K1–K5 in the top 200 px at 1366 × 768 | 6.4, 11.1, `mock-ux.md` S-01 |
-| 17 | Does the analytics dashboard include charts and data tables? | **Done**: four charts and four tables, each with a defined metric | 6.4, 11.2, `mock-ux.md` S-13 |
+| 16 | Does the main screen show distinct KPI cards above the fold? | **Done**: five cards K1–K5 in the top 200 px at 1366 × 768 | 6.4, 11.1, [mock-ux.md](../ux/mock-ux.md) S-01 |
+| 17 | Does the analytics dashboard include charts and data tables? | **Done**: four charts and four tables, each with a defined metric | 6.4, 11.2, [mock-ux.md](../ux/mock-ux.md) S-13 |
 
 ---
 
@@ -885,9 +885,9 @@ The mentor's M1 review asked for three fixes before approval.
 
 | # | Review comment | What we changed | Where |
 |---|---|---|---|
-| 1 | Fully confirm and validate your dataset fields (remove all "To check" statuses) | Validated all 30 fields on 2026-10-06: scripted checks over all 510 CUAD contracts (13,823 of 13,823 label offsets exact), EDGAR full-text search and two amendments read in full, five vendor documents read in full. 17 fields Confirmed, 13 Known issue with an ingestion rule. Eleven decisions (DV-1 to DV-11) changed the plan: label source, TXT source, title patterns, six redaction forms, footer cleaning, supplier target (100–140 suppliers, 30–50 key), date rules, amendment chains, vendor selection. | Section 5, 2.1, 10.2, R-10, A-6, A-9; `data-validation-report.md` |
-| 2 | Add distinct KPI cards above the fold on your main screen | Five cards (K1 questions asked, K2 answer rate, K3 time to checked answer, K4 time to first token, K5 citation accuracy), each with formula, target or threshold, status and window, placed in the top 200 px of the Ask screen at 1366 × 768. New story US-19, feature F-16, requirement FR-12, delivery KPI-15. | 6.4, 7.2, 8.1, 9.1, 11.1; `mock-ux.md` S-01 |
-| 3 | Incorporate basic charts or data tables to fully satisfy the analytics dashboard requirements | Insights tab with four charts (outcomes per day, response time per day with target line, questions by topic, corpus coverage) and four tables (supplier activity, unanswered questions, eval vs targets, corpus by supplier), with period and supplier filters, empty and low-sample states. New stories US-20, US-21, feature F-17, persona P6. | 6.4, 7.1, 7.2, 8.1, 11.2; `mock-ux.md` S-13 |
+| 1 | Fully confirm and validate your dataset fields (remove all "To check" statuses) | Validated all 30 fields on 2026-10-06: scripted checks over all 510 CUAD contracts (13,823 of 13,823 label offsets exact), EDGAR full-text search and two amendments read in full, five vendor documents read in full. 17 fields Confirmed, 13 Known issue with an ingestion rule. Eleven decisions (DV-1 to DV-11) changed the plan: label source, TXT source, title patterns, six redaction forms, footer cleaning, supplier target (100–140 suppliers, 30–50 key), date rules, amendment chains, vendor selection. | Section 5, 2.1, 10.2, R-10, A-6, A-9; [data-validation-report.md](../data/data-validation-report.md) |
+| 2 | Add distinct KPI cards above the fold on your main screen | Five cards (K1 questions asked, K2 answer rate, K3 time to checked answer, K4 time to first token, K5 citation accuracy), each with formula, target or threshold, status and window, placed in the top 200 px of the Ask screen at 1366 × 768. New story US-19, feature F-16, requirement FR-12, delivery KPI-15. | 6.4, 7.2, 8.1, 9.1, 11.1; [mock-ux.md](../ux/mock-ux.md) S-01 |
+| 3 | Incorporate basic charts or data tables to fully satisfy the analytics dashboard requirements | Insights tab with four charts (outcomes per day, response time per day with target line, questions by topic, corpus coverage) and four tables (supplier activity, unanswered questions, eval vs targets, corpus by supplier), with period and supplier filters, empty and low-sample states. New stories US-20, US-21, feature F-17, persona P6. | 6.4, 7.1, 7.2, 8.1, 11.2; [mock-ux.md](../ux/mock-ux.md) S-13 |
 
 Second AI-assisted pass on v1.1 (prompts 2, 4 and 5):
 
@@ -918,7 +918,7 @@ Still to do before final submission:
 | D6 | Is a wrong-refusal rate of 10% or less an acceptance gate? | Yes | KPI-06, 6.2 |
 | D7 | Where do the KPI cards and charts live? | Cards on both tabs, above the conversation on Ask; charts and tables only on the Insights tab, so the chat stays one click from the input | F-16, F-17 |
 | D8 | Do eval runs count in live metrics? | No: live metrics use `client = ui` only; eval results appear only in K5 and table M-11 | M-01 to M-04, R-16 |
-| DV-1 to DV-11 | Data decisions from the validation | See `data-validation-report.md` section 6 | Section 5 |
+| DV-1 to DV-11 | Data decisions from the validation | See [data-validation-report.md](../data/data-validation-report.md) section 6 | Section 5 |
 
 ### 17.2 Open questions for the M1 review
 
@@ -971,8 +971,8 @@ Still to do before final submission:
 | `R-##` | Risk | 12 |
 | `A-#` | Assumption | 13 |
 | `D#` | Design decision | 17.1 |
-| `DV-#` | Data decision from validation | `data-validation-report.md` |
-| `E-##` | Validation evidence | `data-validation-report.md` |
+| `DV-#` | Data decision from validation | [data-validation-report.md](../data/data-validation-report.md) |
+| `E-##` | Validation evidence | [data-validation-report.md](../data/data-validation-report.md) |
 | `Q#` | Open question | 17.2 |
 | `M#` | Milestone | 14.3 |
 | `W# D#` | Sprint week and day | throughout |

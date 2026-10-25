@@ -7,7 +7,7 @@ This document traces how data moves through ClauseCheck. There are two flows and
 
 The offline flow writes to storage and the online flow only reads from it (apart from logs, cache and session history). Keeping that boundary strict is what lets us rebuild the index without touching the query path.
 
-Related documents: `tdd.md` (components and APIs), `rag-architecture-design.md`, `chunking-strategy.md`, `retrieval-design.md`, `prompt-design.md`.
+Related documents: [tdd.md](tdd.md) (components and APIs), [rag-architecture-design.md](rag-architecture-design.md), `chunking-strategy.md`, `retrieval-design.md`, `prompt-design.md`.
 
 ---
 

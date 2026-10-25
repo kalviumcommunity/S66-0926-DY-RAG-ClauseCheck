@@ -1,7 +1,7 @@
 # ClauseCheck: UI States
 
 Sprint 2, Simulated Work (AI Application Development with RAG)
-See also: `mock-ux.md` (S-02, S-06, S-07, S-11, S-12, section 7 and 9), `PRD.md` (section 11), `functional-requirements.md` (FR-7, FR-10), `non-functional-requirements.md` (NFR-6), `api-design.md`, `user-flows.md`
+See also: [mock-ux.md](mock-ux.md) (S-02, S-06, S-07, S-11, S-12, section 7 and 9), [PRD.md](../requirements/PRD.md) (section 11), [functional-requirements.md](../requirements/functional-requirements.md) (FR-7, FR-10), [non-functional-requirements.md](../requirements/non-functional-requirements.md) (NFR-6), [api-design.md](../architecture/api-design.md), [user-flows.md](user-flows.md)
 Version: 1.0, 2026-10-01
 Status: draft for M1 review, alongside the Mock UX.
 
@@ -13,7 +13,7 @@ This document specifies the **five non-happy-path state families** of the Clause
 4. **Error**: the system failed and could not produce an answer
 5. **Empty corpus**: there is nothing in the index (or in the selected scope) to answer from
 
-`mock-ux.md` defines the screens; this document defines **when each state is entered, what it shows, what the user can do, and how it is left**. If the two disagree on copy or layout, `mock-ux.md` wins and this file is updated. If either disagrees with `functional-requirements.md` on behaviour, the FR document wins.
+[mock-ux.md](mock-ux.md) defines the screens; this document defines **when each state is entered, what it shows, what the user can do, and how it is left**. If the two disagree on copy or layout, [mock-ux.md](mock-ux.md) wins and this file is updated. If either disagrees with [functional-requirements.md](../requirements/functional-requirements.md) on behaviour, the FR document wins.
 
 All supplier names, document IDs and values below are made up.
 
@@ -97,7 +97,7 @@ stateDiagram-v2
     RateLimited --> [*]
 ```
 
-| Reply state | Type | Screen in `mock-ux.md` | Section here |
+| Reply state | Type | Screen in [mock-ux.md](mock-ux.md) | Section here |
 |---|---|---|---|
 | Guard | transient, client-side | n/a | 8, 7.4 |
 | Finding, Slow | loading | S-02 (spinner) | 4.2 |
@@ -139,7 +139,7 @@ Colour is never the only signal; every state has an icon **and** a sentence (sec
 
 ### 3.3 Timing thresholds
 
-From NFR targets (first progress within 3 s, KPI-07; total request timeout 40 s, `api-design.md` 5):
+From NFR targets (first progress within 3 s, KPI-07; total request timeout 40 s, [api-design.md](../architecture/api-design.md) 5):
 
 | Threshold | Value | Effect |
 |---|---|---|
@@ -286,7 +286,7 @@ If `semantic_search_unavailable` is known before streaming (from `/health` = `de
 
 ### 5.5 ST-5 Stopped by user (new state)
 
-`user-flows.md` requires a Stop button. Because validation runs **after** the last token, a stopped answer has never been checked. Showing it as if it were an answer would break UX-1 and UX-5.
+[user-flows.md](user-flows.md) requires a Stop button. Because validation runs **after** the last token, a stopped answer has never been checked. Showing it as if it were an answer would break UX-1 and UX-5.
 
 ```text
 |  ClauseCheck                                                                  |
@@ -300,12 +300,12 @@ If `semantic_search_unavailable` is known before streaming (from `/health` = `de
 | Rule | Detail |
 |---|---|
 | Client | Aborts the request (closes the stream) |
-| Server | Cancels generation on disconnect (`api-design.md` 4.2); logs `outcome = stopped` |
+| Server | Cancels generation on disconnect ([api-design.md](../architecture/api-design.md) 4.2); logs `outcome = stopped` |
 | Text | Removed, replaced by the amber box |
 | "Ask again" | Re-sends the same question with the same supplier |
 | Conversation history | The stopped turn is **not** used for follow-up carry-over (no validated supplier answer) |
 
-This differs from `user-flows.md` ("keep what was generated and only show citations for that text"). See Q-ST-1.
+This differs from [user-flows.md](user-flows.md) ("keep what was generated and only show citations for that text"). See Q-ST-1.
 
 ---
 
@@ -326,7 +326,7 @@ Refusal = the pipeline worked and correctly decided **not to answer**. It is a v
 
 ### 6.2 Refusal catalogue
 
-| ID | Outcome code(s) | When | Text (from `mock-ux.md` 9.1) | Actions |
+| ID | Outcome code(s) | When | Text (from [mock-ux.md](mock-ux.md) 9.1) | Actions |
 |---|---|---|---|---|
 | R-1 | `refused_low_score`, `refused_model_not_found` | Nothing relevant retrieved, or model says the clauses don't cover it | I couldn't find this in the contracts for {supplier}. Try rephrasing, or check that the document has been uploaded. | Rephrase · Upload a document for {supplier} |
 | R-2 | `refused_unknown_supplier` | Named company is not in the repository | {Name} is not in the contract repository. | Did you mean: {≤2 suggestions} · See all suppliers |
@@ -391,7 +391,7 @@ Error = something failed; **no conclusion about the contracts was reached**. Err
 | Retry | Re-sends the identical request (question, `session_id`, `supplier_id`); does not add a duplicate user message |
 | Retry limit | After 3 failed retries for the same question, Retry stays but the text adds "If this keeps happening, try again in a few minutes." |
 | History | Errored turns are excluded from follow-up rewriting and carry-over |
-| Request ID | Shown in small grey text ("Ref: req_7c11aa") so a report can be traced to logs (`api-design.md` 2.4) |
+| Request ID | Shown in small grey text ("Ref: req_7c11aa") so a report can be traced to logs ([api-design.md](../architecture/api-design.md) 2.4) |
 
 ### 7.2 Error catalogue
 
@@ -439,7 +439,7 @@ The countdown uses `Retry-After`; the typed question stays in the input so the u
 |  └──────────────────────────────────────────────────────────────────────────┘|
 ```
 
-`user-flows.md` proposes keeping the partial answer marked "incomplete". For the same reason as Stop (5.5), the partial text is **unvalidated**, so it is discarded. See Q-ST-1.
+[user-flows.md](user-flows.md) proposes keeping the partial answer marked "incomplete". For the same reason as Stop (5.5), the partial text is **unvalidated**, so it is discarded. See Q-ST-1.
 
 ### 7.6 Degraded is not an error
 
@@ -451,7 +451,7 @@ Reduced mode (S-11b, embedding API down) still produces validated, cited answers
 
 Empty corpus = **there is nothing to retrieve from**, either globally or within the chosen scope. This is a setup state, not a refusal: telling a user "I couldn't find this in the contracts" when there are no contracts is false and teaches them that refusals are meaningless.
 
-`mock-ux.md` does not cover this yet; these are new states (EC-1 to EC-4). `api-design.md` already defines the backend guard (`422 NO_DOCUMENTS_INDEXED`), and `user-flows.md` says "block the question and link to upload".
+[mock-ux.md](mock-ux.md) does not cover this yet; these are new states (EC-1 to EC-4). [api-design.md](../architecture/api-design.md) already defines the backend guard (`422 NO_DOCUMENTS_INDEXED`), and [user-flows.md](user-flows.md) says "block the question and link to upload".
 
 ### 8.1 EC-1 Empty index (0 ready documents)
 
@@ -586,9 +586,9 @@ Reduced mode (5.3) is a **modifier**, not a state: it is shown on top of whichev
 
 ### 10.1 Contract alignment needed
 
-`api-design.md` and `mock-ux.md` disagree in ways that affect these states (already logged as Q-UX-4). For the states in this document, the required behaviour is:
+[api-design.md](../architecture/api-design.md) and [mock-ux.md](mock-ux.md) disagree in ways that affect these states (already logged as Q-UX-4). For the states in this document, the required behaviour is:
 
-| Topic | `api-design.md` today | Required for these states |
+| Topic | [api-design.md](../architecture/api-design.md) today | Required for these states |
 |---|---|---|
 | Not-found signal | Fallback text sent as `token`s, then `done.answerable = false` | Dedicated `refusal` event with `outcome` code, sent instead of tokens (or after, for R-5). The UI must never stream refusal text as if it were an answer |
 | Sources timing | `sources` before tokens | `citations` after validation; if early sources are adopted, they render as "Retrieved (not yet checked)" and are replaced on `citations` |
@@ -600,7 +600,7 @@ Reduced mode (5.3) is a **modifier**, not a state: it is shown on top of whichev
 
 ## 11. Copy deck additions
 
-New fixed strings introduced here (to add to `mock-ux.md` section 9 after review).
+New fixed strings introduced here (to add to [mock-ux.md](mock-ux.md) section 9 after review).
 
 | Key | Text |
 |---|---|
@@ -677,7 +677,7 @@ These are added to the W5 QA checklist and, where automatable, to `tests/ui/test
 
 | ID | Question | Affects | Proposal |
 |---|---|---|---|
-| Q-ST-1 | On Stop or a dropped stream, keep the partial answer (`user-flows.md`) or discard it? | ST-5, E-5 | **Discard.** Citations are validated only after the last token, so partial text is unchecked; keeping it contradicts UX-1 and UX-5. Revisit if validation becomes per-sentence |
+| Q-ST-1 | On Stop or a dropped stream, keep the partial answer ([user-flows.md](user-flows.md)) or discard it? | ST-5, E-5 | **Discard.** Citations are validated only after the last token, so partial text is unchecked; keeping it contradicts UX-1 and UX-5. Revisit if validation becomes per-sentence |
 | Q-ST-2 | Should Stop exist at all in v1, given answers are short (~2 s)? | ST-5 | Keep: it also covers the wrong-supplier case (user sees the supplier line and stops) |
 | Q-EC-1 | Should EC-1 offer a "Load demo corpus" button for reviewers? | EC-1 | Yes in `test`/demo builds only, hidden in normal mode |
 | Q-EC-2 | How does the UI detect an index reset (EC-4)? | `/health` | Add `index_reset_at` (or `index_generation`) to `/health` |

@@ -2,10 +2,10 @@
 
 Sprint 2, Simulated Work (AI Application Development with RAG)
 Repo: `FirstName_ClauseCheck_Kalvium-Community`
-See also: `01-project-overview.md`, `02-project-description.md`, `data-sourcing.md`, `tdd.md`, `rag-architecture-design.md`, `development-plan.md`
+See also: [01-project-overview.md](../01-project-overview.md), [02-project-description.md](../02-project-description.md), [data-sourcing.md](../data/data-sourcing.md), [tdd.md](../architecture/tdd.md), [rag-architecture-design.md](../architecture/rag-architecture-design.md), [development-plan.md](development-plan.md)
 Status: draft. Update with actual dates at each phase gate.
 
-This roadmap is the one-page view of where ClauseCheck is going. **Part A** covers the five sprint phases: what each phase delivers, the gate that closes it, and the milestone it produces. The day-by-day tasks live in `development-plan.md`. **Part B** covers what comes after the sprint. Its main item is **portfolio-wide aggregation**, which the sprint scope deliberately excludes (project description, section 13; RAG design, section 7.2, `out_of_scope_aggregation`).
+This roadmap is the one-page view of where ClauseCheck is going. **Part A** covers the five sprint phases: what each phase delivers, the gate that closes it, and the milestone it produces. The day-by-day tasks live in [development-plan.md](development-plan.md). **Part B** covers what comes after the sprint. Its main item is **portfolio-wide aggregation**, which the sprint scope deliberately excludes (project description, section 13; RAG design, section 7.2, `out_of_scope_aggregation`).
 
 ## Contents
 
@@ -65,7 +65,7 @@ flowchart LR
 
 **Ground rules for the whole sprint**
 
-- A phase closes only when its gate passes, or when the journal records why the team is proceeding anyway and what carries over.
+- A phase closes only when its gate passes, or when the PR description records why the team is proceeding anyway and what carries over.
 - Building starts only after the RAG architecture design is approved (W2 D1).
 - Every retrieval or prompt change is re-run against the eval set before merge (from W3).
 - The held-out split is not run before W5 D4.
@@ -78,10 +78,10 @@ flowchart LR
 
 | Area | Deliverables |
 |---|---|
-| Team & process | Team charter; repo with branch protection; Kanban board; issue templates; daily PR + journal rhythm |
+| Team & process | Team charter; repo with branch protection; Kanban board; issue templates; daily PR rhythm |
 | Platform | Repo layout, `core/config.py` (`pydantic-settings`), `.env.example`, `llm/client.py` skeleton (Gemini + Groq, retries), pre-commit (`ruff`, `black`, `detect-secrets`), CI on PRs |
 | Data | `fetch_sources.py` (CUAD, EDGAR, vendor DPAs/SLAs), `generate_synthetic.py` (seed 42), `manifest.csv`, `suppliers.csv`, `fetch_log.csv` |
-| Planning | PRD, mock UX, `data-sourcing.md` |
+| Planning | PRD, mock UX, [data-sourcing.md](../data/data-sourcing.md) |
 
 **Corpus targets:** 120–200 contracts, 20–40 amendment pairs, 30–50 price schedules, 30–50 compliance documents, 30–50 suppliers, all four formats present.
 

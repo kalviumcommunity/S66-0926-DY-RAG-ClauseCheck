@@ -2,7 +2,7 @@
 
 Sprint 2, Simulated Work (AI Application Development with RAG)
 Repo: `FirstName_ClauseCheck_Kalvium-Community`
-See also: `PRD.md` (sections 6.4, 7, 8, 11), `functional-requirements.md` (FR-7, FR-9, FR-10, FR-12), `rag-architecture-design.md`, `development-plan.md` (W1 D4), `mock-ux-screens.html` (visual mock of S-01 and S-13)
+See also: [PRD.md](../requirements/PRD.md) (sections 6.4, 7, 8, 11), [functional-requirements.md](../requirements/functional-requirements.md) (FR-7, FR-9, FR-10, FR-12), [rag-architecture-design.md](../architecture/rag-architecture-design.md), [development-plan.md](../planning/development-plan.md) (W1 D4), `mock-ux-screens.html` (visual mock of S-01 and S-13)
 Version: 1.1, 2026-10-06
 Status: resubmitted with PRD v1.1 for review (milestone M1).
 
@@ -10,7 +10,7 @@ Status: resubmitted with PRD v1.1 for review (milestone M1).
 
 This document shows **what the user sees and does** in ClauseCheck v1: every screen and state, the copy on it, and how the user moves between them. It turns PRD section 11 (UI layout and states) into a reviewable mock that the W5 UI build (Workstream D) can implement directly, and that the W5 usability session (KPI-01, KPI-09) can test against.
 
-If this document disagrees with `PRD.md` on scope, the PRD wins. If it disagrees with `functional-requirements.md` on behaviour or exact text, that document wins, and this one is updated.
+If this document disagrees with [PRD.md](../requirements/PRD.md) on scope, the PRD wins. If it disagrees with [functional-requirements.md](../requirements/functional-requirements.md) on behaviour or exact text, that document wins, and this one is updated.
 
 | Version | Date | Change | Approved by |
 |---|---|---|---|
@@ -526,7 +526,7 @@ No buttons: there is nothing the user can pick that would make the question answ
 | Rule | Detail |
 |---|---|
 | Badge | Green "✔ VALID as of {AS_OF_DATE}" or red "✖ EXPIRED on {expiry_date}", from the code-computed validity line, not from the answer text (AC-6.14) |
-| Boundary | Valid on the expiry date itself, if Q-1 in `functional-requirements.md` is approved |
+| Boundary | Valid on the expiry date itself, if Q-1 in [functional-requirements.md](../requirements/functional-requirements.md) is approved |
 | Date shown | Always `AS_OF_DATE`, so the user knows what "today" meant |
 
 ---
@@ -1189,7 +1189,7 @@ The personas are simulated (PRD 3.2), so the mock is reviewed in two rounds.
 | Q-UX-1 | The exact `out_of_scope_aggregation` text isn't fixed in the PRD or FR doc. | S-07b, 9.1, AC-7.1 | Use the wording in 9.1 and add it to `rag/refusals.py` |
 | Q-UX-2 | Should an unknown supplier show "Did you mean…" suggestions (fuzzy score 70–89)? | S-06b, `rag/supplier_resolver.py` | Yes, max 2 suggestions, never auto-selected; needs the resolver to return near-misses in the refusal payload |
 | Q-UX-3 | Should "Understood as" show on every rewritten follow-up, or only when the supplier was carried over? | S-08 | Every rewrite, since it costs one line and catches bad rewrites |
-| Q-UX-4 | `api-design.md` uses `/api/v1/ask`, bearer-key auth, numeric `[1]` markers, a `sources`-before-tokens event, and OCR on upload. The PRD, FR doc and this mock use `/chat/stream`, open demo with rate limit, `[C#]` markers, `citations` after tokens, and no OCR. It also has no metrics endpoints. | API contract, S-02, S-12, S-13 | Align `api-design.md` to the PRD (PRD wins on scope) and add the `/metrics/*` endpoints in 7.2. Sending sources before tokens is worth considering: it is the third latency fix in R-09 and would let S-02 show source cards early. |
+| Q-UX-4 | [api-design.md](../architecture/api-design.md) uses `/api/v1/ask`, bearer-key auth, numeric `[1]` markers, a `sources`-before-tokens event, and OCR on upload. The PRD, FR doc and this mock use `/chat/stream`, open demo with rate limit, `[C#]` markers, `citations` after tokens, and no OCR. It also has no metrics endpoints. | API contract, S-02, S-12, S-13 | Align [api-design.md](../architecture/api-design.md) to the PRD (PRD wins on scope) and add the `/metrics/*` endpoints in 7.2. Sending sources before tokens is worth considering: it is the third latency fix in R-09 and would let S-02 show source cards early. |
 | Q-UX-5 | Thumbs up/down is cut item 1. | S-03 footer | Keep it in the mock; hide it in the build if cut |
 | Q-UX-6 | Should the KPI cards on the Ask tab follow the sidebar supplier filter? | S-01, K1–K4 | No: on Ask they always show all suppliers for 7 days, so the team lead's view doesn't change when a buyer pins a supplier; per-supplier numbers live on S-13 |
 | Q-UX-7 | Should the Insights tab be visible to every user of the open demo? | S-13, M-10 shows question text | Yes for v1 (public and synthetic data only, PRD 8.2); hide behind a role once login exists (roadmap H4) |

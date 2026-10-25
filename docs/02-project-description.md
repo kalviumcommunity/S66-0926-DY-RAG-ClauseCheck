@@ -3,7 +3,7 @@
 **Sprint:** Simulated Work, Sprint 2: AI Application Development with RAG
 **Track:** AI Application (RAG)
 **Repository:** `FirstName_ClauseCheck_Kalvium-Community`
-**Related documents:** `01-project-overview.md`
+**Related documents:** [01-project-overview.md](01-project-overview.md)
 
 ---
 
@@ -176,7 +176,7 @@ A labelled question set in `eval/questions.jsonl` with three groups:
 | Correct refusals on unanswerable questions | ≥ 90% |
 | Median time to first token | < 3 s |
 
-Every retrieval or prompt change is re-run against this set, and results are recorded in the daily journal.
+Every retrieval or prompt change is re-run against this set, and results are recorded in the PR description.
 
 ## 9. Technology Stack
 
@@ -216,7 +216,7 @@ Building (Phase 4 onward) starts only after the PRD and RAG architecture design 
 - `data/manifest.csv` with source and licence information
 - Evaluation set and results report
 - PRD, mock UX, and RAG architecture design documents
-- Daily PRs and journals; concept walkthrough videos
+- Daily PRs; concept walkthrough videos
 
 ## 12. Risks and Mitigations
 
