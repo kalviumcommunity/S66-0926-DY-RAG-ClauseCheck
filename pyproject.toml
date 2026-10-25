@@ -21,13 +21,16 @@ target-version = "py311"
 select = ["E", "F", "I", "B", "UP"]
 
 [tool.ruff.lint.per-file-ignores]
-# PR-01 test files are kept verbatim from the brief
+# Test files from the PR briefs are kept verbatim
 "tests/unit/test_repo_layout.py" = ["E501", "E741"]
+"tests/unit/test_fetch_sources.py" = ["E501"]
+"tests/unit/test_manifest.py" = ["E501", "E731"]
+"tests/unit/test_synthetic.py" = ["E501", "E741"]
 
 [tool.black]
 line-length = 100
 # Test files from the PR briefs are kept verbatim
-extend-exclude = "tests/(conftest|unit/test_(smoke|repo_layout|env_example))\\.py"
+extend-exclude = "tests/(conftest|unit/test_(smoke|repo_layout|env_example|schema|fetch_sources|synthetic|manifest))\\.py"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

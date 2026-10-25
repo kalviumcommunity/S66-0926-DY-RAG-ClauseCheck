@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     # Logging
     log_level: str = "INFO"
 
+    # Corpus sourcing
+    edgar_user_agent: str = ""
+    raw_data_dir: Path = Path("data/raw")
+
     # Storage
     data_dir: Path = Path("data")
     index_dir: Path = Path("index")
