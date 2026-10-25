@@ -1,4 +1,5 @@
 supplier_id,display_name,aliases
+adaptimmune-therapeutics,Adaptimmune Therapeutics PLC,Adaptimmune Therapeutics
 airspan-networks,Airspan Networks Incorporated,Airspan|Airspan Networks
 amazon-web-services,Amazon Web Services,
 atlassian,Atlassian,
@@ -9,6 +10,7 @@ changepoint,"Changepoint, Inc",CHANGEPOINT|Changepoint
 cisco-systems,"Cisco Systems, Inc",Cisco|Cisco Systems
 commerce-one,"Commerce One, Inc",COMMERCE ONE|Commerce One
 commnet-wireless,"Commnet Wireless, LLC",Commnet Wireless
+corixa,CORIXA CORP,Corixa
 cro-consulting-pty,CRO Consulting (Pty) Limited,CRO|Cro Consulting Pty
 datec-png,DATEC (PNG) LIMITED,Datec|Datec PNG Limited|Datec Png
 dcl,DCL,
@@ -36,12 +38,14 @@ mobimagic,Mobimagic,"Mobimagic Co., Ltd"
 mpl,MPL,
 netgear,NETGEAR,"NETGEAR, Inc"
 netzee,"NETZEE, INC",Netzee
+oculus-innovative-sciences,"Oculus Innovative Sciences, Inc.",Oculus Innovative Sciences
 organic-preparations,ORGANIC PREPARATIONS INC,Organic Preparations
 owner,Owner,
 parcelway-courier-systems-canada,PARCELWAY COURIER SYSTEMS CANADA LTD,Parcelway Courier Systems Canada
 peregrine-bridge-transfer,Peregrine/Bridge Transfer Corporation,Peregrine Bridge Transfer
 pfizer,Pfizer Inc,Pfizer
 philips-medical-systems-nederland-b-v,PHILIPS MEDICAL SYSTEMS NEDERLAND B.V,Philips|Philips Medical Systems Nederland B V
+reynolds-american,REYNOLDS AMERICAN INC,Reynolds American
 reynolds-consumer-products,REYNOLDS CONSUMER PRODUCTS LLC,Reynolds Consumer Products
 rghi,RGHI,
 sap-africa,SAP AFRICA,
@@ -58,7 +62,9 @@ truelink,"TrueLink, Inc",TrueLink|Truelink
 twilio,Twilio,
 uniquest,Uniquest Corporation,Uniquest
 vendingdata,VendingData Corporation,Vendingdata
+viropharma,VIROPHARMA INC,Viropharma
 wgt,WGT,
 ximage,XIMAGE,XIMAGE corporation
 yournetplus-com,"YourNetPlus.com, Inc",Yournetplus Com
+zix,ZIX CORP,Zix
 zogenix,"ZOGENIX, INC",Zogenix

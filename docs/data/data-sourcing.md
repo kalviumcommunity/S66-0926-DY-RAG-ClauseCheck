@@ -458,18 +458,19 @@ Built with `python scripts/fetch_sources.py` and `python scripts/generate_synthe
 |---|---|---|---|---|---|
 | CUAD | contract | pdf | 47 | 120 to 200 contracts (all sources) | **Shortfall** |
 | CUAD | contract | txt | 11 | | |
-| EDGAR | amendment | html | 0 | 20 to 40 | **Shortfall** |
+| EDGAR | amendment | html, txt | 6 | 20 to 40 | **Shortfall** |
+| EDGAR | contract (the originals of those amendments) | html, txt | 6 | counted under contracts | |
 | Vendor | dpa | html | 5 | 30 to 50 compliance documents (dpa, sla, certificate) | Met (48) |
 | Vendor | sla | html | 13 | | |
 | Synthetic | price_schedule | docx | 40 | 30 to 50 | Met |
 | Synthetic | certificate | txt | 30 | counted under compliance | |
-| All | | | **146** | | |
+| All | | | **158** | | |
 
-Suppliers: **63** (target 30 to 50). Synthetic documents are attached to 40 of them, chosen with seed 42. The synthetic price schedules and certificates are regenerated with the seed, so their raw files are not committed.
+Suppliers: **69** (target 30 to 50). Synthetic documents are attached to 40 of them, chosen with seed 42. The synthetic price schedules and certificates are regenerated with the seed, so their raw files are not committed.
 
 ### 14.1 Shortfalls and their reasons
 
-**Contracts: 58 of 120.** Funnel for CUAD (counts from `scripts/fetch_sources.py`):
+**Contracts: 64 of 120.** Funnel for CUAD (counts from `scripts/fetch_sources.py`):
 
 | Step | Contracts left |
 |---|---|
@@ -481,7 +482,7 @@ Suppliers: **63** (target 30 to 50). Synthetic documents are attached to 40 of t
 
 The 121 before the supplier step is close to the 137 in the validation report; the report counted by title only and did not apply the amendment exclusion. The two later steps are the drop rules in section 8 and DV-8, applied by script. The supplier rule looks for defined terms such as ("Seller") after a party name, and for sentences such as "X shall supply". When neither identifies exactly one provider, the contract is dropped rather than guessed. A person reading the 54 dropped contracts would recover many of them, which is the most direct way to close the gap.
 
-**Amendments: 0 of 20.** The EDGAR step is implemented but has not been run. The SEC requires a real contact email in the user agent (`EDGAR_USER_AGENT`), and none is configured. Until it is run, no amendments or paired originals are in the manifest. The matching logic pairs an amendment only with an original already in the CUAD selection, which may keep the count below 20 even after a run.
+**Amendments: 6 of 20.** The full-text search returns 973 filings for the first query, but the pairing rules keep few of them. An amendment is kept only if its recitals name the agreement it amends, the original is found (in the CUAD selection, or in the same company's EDGAR filings with the same title and date near the top of the document), and the amendment has its own effective date that is not the original's date. The run found 6 amendments, each with its original (Zix, Oculus, Reynolds American, Adaptimmune, Corixa and ViroPharma). The supplier of a pair is the filing company, because the script does not decide which party is the seller. Raising the count means more queries or a more tolerant recital match.
 
 **Suppliers: 63, above the 30 to 50 range.** The range in PRD 5 and the test conflicts with DV-7, which expects 100 to 140 suppliers because almost every CUAD contract is the only one from its company. The corpus has one supplier per contract, plus vendor suppliers, so it cannot reach both 120 contracts and 50 suppliers. The range needs a decision.
 
