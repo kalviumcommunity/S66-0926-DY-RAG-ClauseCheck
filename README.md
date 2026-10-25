@@ -14,7 +14,16 @@ pre-commit install
 pytest -q
 ```
 
-Copy `.env.example` to `.env` and add your API keys once it exists. Never commit `.env`.
+
+## Configuration
+
+All settings are environment variables, read through `clausecheck.core.config.Settings`. Copy `.env.example` to `.env` and fill in `GEMINI_API_KEY` and `GROQ_API_KEY`. Never commit `.env`.
+
+- Keys are `SecretStr`, so printing the settings shows `**********`.
+- If a required key is missing, startup fails and names the variable but prints no values.
+- Logs go through a redaction filter that replaces every key with `[REDACTED]`.
+- Adding a setting means adding it to `Settings` and to `.env.example`; `tests/unit/test_env_example.py` fails if they differ.
+- Gemini is the main LLM. After `LLM_MAX_RETRIES` failures it falls back to Groq.
 
 ## Folder map
 
