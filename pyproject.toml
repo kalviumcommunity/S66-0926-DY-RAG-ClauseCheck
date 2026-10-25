@@ -26,8 +26,8 @@ select = ["E", "F", "I", "B", "UP"]
 
 [tool.black]
 line-length = 100
-# PR-01 test files are kept verbatim from the brief
-extend-exclude = "tests/unit/test_(smoke|repo_layout)\\.py"
+# Test files from the PR briefs are kept verbatim
+extend-exclude = "tests/(conftest|unit/test_(smoke|repo_layout|env_example))\\.py"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
