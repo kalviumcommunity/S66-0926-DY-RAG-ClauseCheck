@@ -99,8 +99,13 @@ def _local_embed_fn(model_name: str) -> EmbedFn:
 
     def embed(texts: list[str]) -> list[list[float]]:
         if "model" not in holder:  # load lazily: the import and download are slow
-            from sentence_transformers import SentenceTransformer
-
+            try:
+                from sentence_transformers import SentenceTransformer
+            except ImportError as exc:
+                raise RuntimeError(
+                    "EMBED_PROVIDER=local needs sentence-transformers: "
+                    "pip install sentence-transformers==6.2.0"
+                ) from exc
             holder["model"] = SentenceTransformer(model_name)
         return holder["model"].encode(texts, normalize_embeddings=True).tolist()
 
