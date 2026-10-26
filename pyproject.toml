@@ -35,11 +35,14 @@ select = ["E", "F", "I", "B", "UP"]
 "tests/unit/test_eval_set.py" = ["E501"]
 "tests/unit/test_run_eval.py" = ["E501"]
 "tests/unit/test_vector_retriever.py" = ["E501"]
+"tests/unit/test_bm25.py" = ["E501"]
+"tests/unit/test_ablation.py" = ["E741"]
+"tests/integration/test_hybrid_retrieval.py" = ["E501"]
 
 [tool.black]
 line-length = 100
 # Test files from the PR briefs are kept verbatim
-extend-exclude = "tests/(conftest|helpers|fixtures/make_fixtures|integration/test_ingest|unit/test_(smoke|repo_layout|env_example|schema|fetch_sources|synthetic|manifest|chunker|sqlite|eval_metrics|eval_set|run_eval|vector_retriever))\\.py"
+extend-exclude = "tests/(conftest|helpers|fixtures/make_fixtures|integration/test_(ingest|hybrid_retrieval)|unit/test_(smoke|repo_layout|env_example|schema|fetch_sources|synthetic|manifest|chunker|sqlite|eval_metrics|eval_set|run_eval|vector_retriever|bm25|reranker|ablation))\\.py"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

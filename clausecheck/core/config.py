@@ -35,6 +35,15 @@ class Settings(BaseSettings):
     index_version: str = "v1"
     top_k: int = 5
 
+    # Retrieval: hybrid search, re-ranking and supplier detection
+    rrf_k: int = 60
+    vector_k: int = 20
+    bm25_k: int = 20
+    rerank_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    rerank_candidates: int = 20
+    rerank_top_n: int = 5
+    supplier_match_min: int = 85
+
     # Chunking
     chunk_max_tokens: int = 512
     chunk_window: int = 400

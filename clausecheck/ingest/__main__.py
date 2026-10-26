@@ -67,6 +67,11 @@ def main(argv: list[str] | None = None) -> int:
     for status, n in sorted(by_status.items()):
         print(f"{status:<12}{n:>10}")
     print(f"total chunks: {sum(r.n_chunks for r in results)}")
+    if not args.dry_run:
+        from clausecheck.store.bm25_index import BM25Index
+
+        # built only to check it works; the keyword index stays in memory at query time
+        print(f"bm25 index: {BM25Index.from_conn(conn).size()} chunks")
     if store is not None:
         print(f"vectors in {store.collection_name}: {store.count()}")
     failures = [r for r in results if r.status == "failed"]
