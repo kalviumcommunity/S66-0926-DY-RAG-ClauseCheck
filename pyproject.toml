@@ -40,6 +40,8 @@ select = ["E", "F", "I", "B", "UP"]
 "tests/unit/test_vector_retriever.py" = ["E501"]
 "tests/unit/test_bm25.py" = ["E501"]
 "tests/unit/test_ablation.py" = ["E741"]
+"tests/unit/test_answer_metrics.py" = ["E501"]
+"tests/unit/test_citation_validator.py" = ["E501"]
 "tests/unit/test_context_builder.py" = ["E501"]
 "tests/unit/test_relevance_gate.py" = ["E501"]
 "tests/unit/test_prompts.py" = ["E501"]
@@ -49,7 +51,7 @@ select = ["E", "F", "I", "B", "UP"]
 [tool.black]
 line-length = 100
 # Test files from the PR briefs are kept verbatim
-extend-exclude = "tests/(conftest|helpers|fixtures/make_fixtures|integration/test_(ingest|hybrid_retrieval)|unit/test_(smoke|repo_layout|env_example|schema|fetch_sources|synthetic|manifest|chunker|sqlite|eval_metrics|eval_set|run_eval|vector_retriever|bm25|reranker|ablation|prompts|generator|context_builder|relevance_gate))\\.py"
+extend-exclude = "tests/(conftest|helpers|fixtures/make_fixtures|integration/test_(ingest|hybrid_retrieval)|unit/test_(smoke|repo_layout|env_example|schema|fetch_sources|synthetic|manifest|chunker|sqlite|eval_metrics|eval_set|run_eval|vector_retriever|bm25|reranker|ablation|prompts|generator|context_builder|relevance_gate|citation_validator|answer_metrics))\\.py"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
