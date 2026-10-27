@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     # Logging
     log_level: str = "INFO"
 
+    # Chunking
+    chunk_max_tokens: int = 512
+    chunk_window: int = 400
+    chunk_overlap: int = 60
+
     # Corpus sourcing
     edgar_user_agent: str = ""
     raw_data_dir: Path = Path("data/raw")

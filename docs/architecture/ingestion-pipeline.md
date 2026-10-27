@@ -849,3 +849,31 @@ Not built: character normalisation (C1), the boilerplate list, repeated header d
 
 **Check on the corpus.** All 146 documents in the manifest load and clean without error. 25 of the 58 CUAD contracts (43%) and 1 vendor page are flagged as redacted. The validation report found 42% of procurement-type CUAD contracts with markers.
 
+---
+
+## 16. Chunker, SQLite store and ingest CLI as built (PR 5)
+
+**Chunker (`ingest/chunker.py`).** `chunk(doc, max_tokens=512, window=400, overlap=60)` turns a `CleanDocument` into `Chunk`s (fields in `ingest/models.py`).
+
+- A line is a heading if it starts with `2.`, `2.1`, `Section 2` or `ARTICLE IV`. A top-level heading of at most 80 characters that does not end in `.`, `;` or `,` becomes the current `section` and starts a chunk with that number as `clause_no`. Sub-numbered lines (`2.1`) always start their own chunk. A section heading with no body text produces no chunk.
+- Text before the first heading becomes a `pre` chunk. A document with no headings gets one chunk per page (`page1`, `page2`, ...).
+- A chunk over `max_tokens` is split into windows of `window` tokens, each starting `window - overlap` after the last; `token_start` and `token_end` record the offsets. Window IDs end in `-w0`, `-w1`, ...
+- Each table is one chunk (`is_table`, `section="table"`, no `clause_no`): the header joined with ` | `, then one line per row. Long tables are split into row groups that each repeat the header. A single row that is longer than the cap is split by tokens, with the header repeated. If the header alone is more than half the cap, which happens when pdfplumber reports a paragraph as a one-row table, the table text is split into plain token windows with no repeated header.
+- `chunk_id` is `{doc_id}:p{page}:{part}`, where `part` is the clause number with dots turned into `_`, `pre`, `page{n}`, `t{table}-{group}` or a window suffix. A repeated part gets `-2`, `-3`, ... in document order.
+- `has_redaction` is true if the starting page is flagged or the chunk text itself contains a redaction marker (a continuation page can add one).
+
+Known gaps: clause numbers written `1. 1.` (common in PDF contracts) are read as a second top-level `1`, so they get the IDs `1`, `1-2`, `1-3`; and the `[[TABLE:tN]]` anchors from section 3 are not used, so table values also appear in the page chunks.
+
+**SQLite (`store/sqlite.py`).** Tables: `documents` (all manifest columns plus `has_redaction`, `status`, `error`, `n_chunks`, `ingested_at`), `chunks` (every `Chunk` field, `doc_id` references `documents` with `ON DELETE CASCADE`, indexes on `supplier_id` and `doc_id`), `suppliers`, `aliases` and `jobs`. Connections turn on foreign keys and WAL mode (not for `:memory:`). `upsert_document` updates only the columns it is given, so a failed re-run keeps the old `sha256` and chunks.
+
+**Service and CLI.** `ingest_document` hashes the file; if the stored document has the same hash and `status="ingested"` it returns `unchanged` without loading. Any exception is stored as `status="failed"` with `ExceptionType: message`, and the run continues. `run_manifest` orders rows so that a parent comes before its amendments. If a PDF has no text layer and a `json_text/<name>.txt` file sits next to it (written by `fetch_sources.py`), that text is used (DV-2).
+
+```bash
+python -m clausecheck.ingest [--manifest data/manifest.csv] [--suppliers data/suppliers.csv]
+                             [--db PATH] [--root .] [--dry-run] [--rebuild] [--only-supplier ID]
+```
+
+It prints the number of documents per status, the total chunks and each failure with its error. The exit code is 1 only if every document failed. A dry run writes nothing, and does not create the database file.
+
+**On the current corpus** (146 documents, no EDGAR amendments yet): 6,622 chunks, an average of 142 tokens, a maximum of 511. By source: CUAD 58 documents and 5,954 chunks; vendor 18 and 558; synthetic 70 and 110. A dry run takes about 50 seconds, mostly PDF table extraction.
+
