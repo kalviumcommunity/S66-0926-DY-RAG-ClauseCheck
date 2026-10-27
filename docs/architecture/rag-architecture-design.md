@@ -699,6 +699,37 @@ Every retrieval change is evaluated across this matrix so we can show what each 
 
 Chunking is compared the same way: fixed 500-token chunks vs clause-aware chunks, holding everything else constant.
 
+### 12.3.1 Retrieval as built, and the ablation result (PR 8)
+
+Final retrieval parameters (all in `.env`, defaults in `clausecheck/core/config.py`):
+
+| Parameter | Value |
+|---|---|
+| `VECTOR_K`, `BM25_K` | 20 and 20 candidates per retriever |
+| `RRF_K` | 60 |
+| `RERANK_CANDIDATES`, `RERANK_TOP_N` | 20 fused candidates in, 5 out |
+| `RERANK_MODEL` | `cross-encoder/ms-marco-MiniLM-L-6-v2` |
+| `SUPPLIER_MATCH_MIN` | 85 |
+
+Where the implementation differs from sections 7.2 and 7.4:
+
+- **Supplier detection** uses `rapidfuzz.fuzz.partial_ratio` on lowercase names and aliases of at least 3 characters, with a minimum score of 85, not `token_set_ratio` at 90. The best score wins and ties go to the longer name. A clear new match replaces the previous supplier; no match keeps it. The carry-over rules for "they" and "their", the unknown-supplier refusal and the multiple-supplier clarification are not built yet.
+- **Amendment expansion** works from chunk text, not from a second BM25 search. A hit in an amendment adds the parent's chunks whose clause number it mentions ("Section 2.1") or shares. A hit in an original adds the child chunks that mention its clause number. Chains are followed up to 3 levels, and expanded hits are added after the top `k`. There is no cap of 2 extra chunks.
+- **Re-ranking** keeps every expanded hit right after the highest-ranked hit of its parent or child document, even beyond the top 5. There is no 1.5 second timeout yet.
+- **Tokenizer**: BM25 uses a regex that keeps `net`, `45`, `a-114`, `$1,250.00` and `7.2%` as single tokens, with no stemming and no stop words. A chunk is returned only if it shares a token with the query.
+
+Ablation on the tuning split (31 answerable questions), recall@5 and MRR:
+
+| Retriever | Supplier filter | recall@5 | MRR |
+|---|---|---|---|
+| BM25 only | on | 0.855 | 0.725 |
+| BM25 only | off | 0.435 | 0.394 |
+| Vector only | on / off | to be filled in by `python -m eval.run_eval --split tune --stage retrieval --ablation` | |
+| Hybrid (RRF) | on / off | to be filled in | |
+| Hybrid + re-rank | on / off | to be filled in | |
+
+The BM25 rows were measured offline. The other rows need real embeddings (a Gemini key and a built Chroma collection), so they are not recorded yet. The finding so far is that the supplier filter matters more than the ranking method: with it off, keyword search drops from 0.855 to 0.435.
+
 ### 12.4 Threshold tuning procedure
 
 1. Run the tuning split with the gate disabled; record top-1 re-ranker score for every question.
