@@ -175,9 +175,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--supplier-filter", choices=["on", "off"], default="on")
     parser.add_argument("--ablation", action="store_true", help="4 retrievers x filter on/off")
     parser.add_argument("--sweep", metavar="RANGE", help="threshold sweep range start:stop:step")
+    parser.add_argument(
+        "--agreement", metavar="PATH", help="hand-graded sample CSV for judge agreement"
+    )
     parser.add_argument("--allow-heldout", action="store_true")
     args = parser.parse_args(argv)
 
+    if args.agreement:
+        return _run_agreement(args)
     if args.split == "heldout" and not args.allow_heldout:
         print(
             "The held-out split is not run before W5 D4. Pass --allow-heldout to run it anyway.",
@@ -185,8 +190,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 2
     if args.stage == "e2e":
-        print("stage 'e2e' is available from PR 14", file=sys.stderr)
-        return 3
+        return _run_e2e(args)
     if args.stage == "answer":
         if args.sweep:
             return _run_sweep(args)
@@ -374,6 +378,150 @@ def _run_sweep(args) -> int:
         writer.writeheader()
         writer.writerows(rows)
     print(f"-> {sweep_path}")
+    return 0
+
+
+def _run_e2e(args) -> int:
+    import csv
+    import statistics
+
+    from clausecheck.core.config import get_settings
+    from clausecheck.services.query_service import QueryService
+    from clausecheck.store import sqlite as db
+    from eval.judge import build_judge_client, grade, sample_for_review
+    from eval.metrics import (
+        answer_correctness,
+        citation_accuracy,
+        contains_expected,
+        false_refusal_rate,
+        refusal_accuracy,
+    )
+
+    settings = get_settings()
+    conn = db.connect(settings.sqlite_path)
+    db.init_db(conn)
+    svc = QueryService.from_settings(settings, conn)
+    judge_client = build_judge_client(settings)
+    from clausecheck.prompts.loader import load_prompt
+
+    judge_prompt = load_prompt("judge")
+
+    questions = load_questions(args.questions, split=args.split)
+    records = []
+    grades = []
+    cited_ids = []
+    gold_ids = []
+    refused_flags = []
+    should_refuse_flags = []
+    latencies = []
+
+    for q in questions:
+        r = svc.answer(q.question, supplier_filter=q.supplier_id)
+        outcome = r.outcome
+        answer = r.answer
+        citations = [c.chunk_id for c in r.citations]
+        if q.should_refuse:
+            g = "correct" if outcome == "refused" else "wrong"
+        else:
+            if q.group == "exact":
+                g = "correct" if contains_expected(answer, q.expected_answer) else "wrong"
+            else:
+                gr = grade(judge_client, judge_prompt, q.question, q.expected_answer, answer)
+                g = gr.label
+        needs_judge = q.group == "real" and not q.should_refuse
+        records.append(
+            {
+                "qid": q.qid,
+                "group": q.group,
+                "question": q.question,
+                "expected": q.expected_answer,
+                "answer": answer,
+                "citations": citations,
+                "outcome": outcome,
+                "grade": g,
+                "needs_judge": needs_judge,
+                "latency_ms": r.timings.get("total", 0.0),
+            }
+        )
+        grades.append(g)
+        cited_ids.append(citations)
+        gold_ids.append(q.gold_chunk_ids)
+        refused_flags.append(outcome == "refused")
+        should_refuse_flags.append(q.should_refuse)
+        latencies.append(r.timings.get("total", 0.0))
+
+    metrics = {
+        "answer_correctness": answer_correctness(grades) if grades else 0.0,
+        "citation_accuracy": (
+            citation_accuracy(cited_ids, gold_ids)
+            if any(c and g for c, g in zip(cited_ids, gold_ids, strict=False))
+            else 0.0
+        ),
+        "refusal_accuracy": refusal_accuracy(refused_flags, should_refuse_flags),
+        "false_refusal_rate": false_refusal_rate(refused_flags, should_refuse_flags),
+        "median_latency_ms": statistics.median(latencies) if latencies else 0.0,
+    }
+
+    # judge sample csv
+    sample = sample_for_review(records, frac=0.1, seed=42)
+    out_dir = Path(args.out)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    date = dt.datetime.now(dt.UTC).date().isoformat()
+    sample_path = out_dir / f"{date}_judge_sample_{args.split}.csv"
+    with sample_path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(
+            f, fieldnames=["qid", "question", "expected", "answer", "judge_label", "human_label"]
+        )
+        writer.writeheader()
+        for row in sample:
+            gr = None
+            if row.get("group") == "real" and not row.get("should_refuse", False):
+                pass
+            # find grade label
+            judge_label = row.get("grade", "")
+            writer.writerow(
+                {
+                    "qid": row["qid"],
+                    "question": row["question"],
+                    "expected": row["expected"],
+                    "answer": row["answer"],
+                    "judge_label": judge_label,
+                    "human_label": "",
+                }
+            )
+
+    result = {"metrics": metrics, "per_question": records}
+    path = write_results(result, "e2e", args.split, args.out)
+    print(json.dumps(metrics, indent=2))
+    print(f"-> {path}")
+    print(f"-> {sample_path}")
+    return 0
+
+
+def _run_agreement(args) -> int:
+    import csv
+
+    from eval.judge import agreement as compute_agreement
+
+    path = Path(args.agreement)
+    judge_labels = []
+    human_labels = []
+    with path.open(newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            hl = (row.get("human_label") or "").strip()
+            if not hl:
+                continue
+            judge_labels.append(row.get("judge_label", ""))
+            human_labels.append(hl)
+    if not judge_labels:
+        print("no hand-graded rows found", file=sys.stderr)
+        return 1
+    print(
+        "agreement: "
+        f"{compute_agreement(judge_labels, human_labels):.3f} "
+        f"over {len(judge_labels)} rows"
+    )
     return 0
 
     return 0
