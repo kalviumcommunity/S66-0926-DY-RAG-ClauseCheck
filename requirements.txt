@@ -20,6 +20,11 @@ rapidfuzz==3.14.6
 # Optional, only for EMBED_PROVIDER=local (pulls in PyTorch, several GB, so CI does not install it):
 #   pip install sentence-transformers==6.2.0
 
+# API (PR 15)
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+httpx==0.27.2
+
 # Dev
 pytest==9.1.1
 pytest-cov==7.1.0

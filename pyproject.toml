@@ -40,6 +40,13 @@ select = ["E", "F", "I", "B", "UP"]
 "tests/unit/test_vector_retriever.py" = ["E501"]
 "tests/unit/test_bm25.py" = ["E501"]
 "tests/unit/test_ablation.py" = ["E741"]
+"clausecheck/api/routes/catalog.py" = ["B008", "E501"]
+"clausecheck/api/routes/chat.py" = ["B008", "E501"]
+"clausecheck/api/routes/health.py" = ["B008", "E501"]
+"clausecheck/api/routes/sessions.py" = ["B008", "E501"]
+"tests/api/test_catalog_health.py" = ["E501"]
+"tests/api/test_chat.py" = ["E501"]
+"tests/api/test_secrets_sentinel.py" = ["E501"]
 "tests/unit/test_judge.py" = ["E501"]
 "tests/integration/test_query_service.py" = ["E501"]
 "tests/unit/test_cache.py" = ["E501"]
@@ -57,7 +64,7 @@ select = ["E", "F", "I", "B", "UP"]
 [tool.black]
 line-length = 100
 # Test files from the PR briefs are kept verbatim
-extend-exclude = "tests/(conftest|helpers|fixtures/make_fixtures|integration/test_(ingest|hybrid_retrieval|query_service)|unit/test_(smoke|repo_layout|env_example|schema|fetch_sources|synthetic|manifest|chunker|sqlite|eval_metrics|eval_set|run_eval|vector_retriever|bm25|reranker|ablation|prompts|generator|context_builder|relevance_gate|citation_validator|answer_metrics|cache|query_log|rewriter|sessions|judge))\\.py"
+extend-exclude = "tests/(conftest|helpers|fixtures/make_fixtures|api/test_(chat|catalog_health|secrets_sentinel)|integration/test_(ingest|hybrid_retrieval|query_service)|unit/test_(smoke|repo_layout|env_example|schema|fetch_sources|synthetic|manifest|chunker|sqlite|eval_metrics|eval_set|run_eval|vector_retriever|bm25|reranker|ablation|prompts|generator|context_builder|relevance_gate|citation_validator|answer_metrics|cache|query_log|rewriter|sessions|judge))\\.py"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
