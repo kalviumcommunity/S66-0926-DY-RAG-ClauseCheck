@@ -1,0 +1,7 @@
+# v1
+Turn the latest question into one stand-alone question that names the supplier and the subject from the history. Output only the question.
+
+History:
+{{history}}
+
+Latest question: {{question}}
