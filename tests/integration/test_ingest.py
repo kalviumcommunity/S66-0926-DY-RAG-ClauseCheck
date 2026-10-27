@@ -62,6 +62,6 @@ def test_only_supplier_filter(tmp_path, fixture_paths):
 
 def test_cli_returns_zero_and_prints_summary(tmp_path, fixture_paths, capsys):
     manifest, suppliers, _ = _setup(tmp_path, fixture_paths)
-    code = main(["--manifest", str(manifest), "--suppliers", str(suppliers), "--db", str(tmp_path / "cli.db")])
+    code = main(["--manifest", str(manifest), "--suppliers", str(suppliers), "--db", str(tmp_path / "cli.db"), "--no-embed"])
     assert code == 0
     assert "ingested" in capsys.readouterr().out

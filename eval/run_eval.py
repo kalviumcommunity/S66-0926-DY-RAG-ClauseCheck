@@ -14,6 +14,26 @@ from eval.schema import Question, load_questions
 RETRIEVERS: dict[str, Callable[[], Callable[[Question], list[str]]]] = {}
 
 
+def _vector_retriever() -> Callable[[Question], list[str]]:
+    """Semantic search over the Chroma collection for the configured embedding model."""
+    from clausecheck.core.config import get_settings
+    from clausecheck.ingest.embedder import Embedder
+    from clausecheck.rag.vector_retriever import VectorRetriever
+    from clausecheck.store import sqlite as db
+    from clausecheck.store.vector_store import VectorStore
+
+    settings = get_settings()
+    conn = db.connect(settings.sqlite_path)
+    db.init_db(conn)
+    retriever = VectorRetriever(
+        Embedder.from_settings(settings, conn), VectorStore.from_settings(settings)
+    )
+    return lambda q: [h.chunk_id for h in retriever.retrieve(q.question, q.supplier_id, k=20)]
+
+
+RETRIEVERS["vector"] = _vector_retriever
+
+
 def write_results(
     result: dict, stage: str, split: str, out_dir: Path, run_date: str | None = None
 ) -> Path:
