@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     groq_api_key: SecretStr
     gemini_model: str = "gemini-2.0-flash"
     groq_model: str = "llama-3.3-70b-versatile"
+    judge_model: str = "llama-3.3-70b-versatile"
 
     # LLM client behaviour
     llm_timeout_seconds: float = 30.0

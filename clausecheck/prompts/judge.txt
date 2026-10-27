@@ -1,0 +1,6 @@
+# v1
+Grade the answer against the expected answer. Reply with JSON only: {"label": "correct" | "partial" | "wrong", "reason": "<one sentence>"}. Grade by meaning. A missing citation does not change the label.
+
+Question: {{question}}
+Expected: {{expected}}
+Answer: {{answer}}
