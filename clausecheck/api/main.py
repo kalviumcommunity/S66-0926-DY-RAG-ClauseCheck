@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from clausecheck.api.container import AppContainer
-from clausecheck.api.routes import catalog, chat, health, sessions
+from clausecheck.api.routes import catalog, chat, documents, feedback, health, insights, sessions
 from clausecheck.core.config import get_settings
 from clausecheck.core.logging import RedactionFilter, setup_logging
 
@@ -77,6 +77,9 @@ def create_app(container: AppContainer | None = None) -> FastAPI:
     app.include_router(chat.router)
     app.include_router(catalog.router)
     app.include_router(health.router)
+    app.include_router(documents.router)
+    app.include_router(feedback.router)
+    app.include_router(insights.router)
 
     if container is not None:
         app.state.container = container

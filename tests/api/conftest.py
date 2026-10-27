@@ -5,6 +5,7 @@ from clausecheck.api.container import AppContainer
 from clausecheck.api.main import create_app
 from clausecheck.core.config import Settings
 from clausecheck.rag.citation_validator import Citation
+from clausecheck.services.ingestion_service import DuplicateDocumentError
 from clausecheck.services.query_service import QueryResult, StreamEvent
 from clausecheck.services.sessions import SessionStore
 from clausecheck.store import sqlite as db
@@ -78,9 +79,34 @@ class FakeQueryService:
         )
 
 
+class FakeUploadService:
+    def __init__(self):
+        self.jobs = {}
+
+    def submit(self, filename, content, supplier_id, doc_type="contract"):
+        if content == b"duplicate":
+            raise DuplicateDocumentError("doc-a")
+        job_id = f"job-{len(self.jobs) + 1}"
+        self.jobs[job_id] = {
+            "job_id": job_id,
+            "status": "done",
+            "doc_id": "upload-x",
+            "error": None,
+        }
+        return job_id
+
+    def get_job(self, job_id):
+        return self.jobs.get(job_id)
+
+
 @pytest.fixture
 def container(tmp_path):
-    settings = Settings(_env_file=None, sqlite_path=tmp_path / "api.db")
+    settings = Settings(
+        _env_file=None,
+        max_upload_mb=1,
+        sqlite_path=tmp_path / "api.db",
+        uploads_dir=tmp_path / "uploads",
+    )
     conn = db.connect(settings.sqlite_path)
     db.init_db(conn)
     db.upsert_supplier(conn, "S-ACME", "Acme Corp", ["Acme"])
@@ -102,6 +128,7 @@ def container(tmp_path):
         settings=settings,
         conn=conn,
         query_service=FakeQueryService(query_log),
+        upload_service=FakeUploadService(),
         sessions=SessionStore(3),
         query_log=query_log,
         vector_count=lambda: 1,

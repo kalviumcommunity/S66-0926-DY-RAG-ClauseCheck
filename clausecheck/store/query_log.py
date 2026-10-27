@@ -48,7 +48,31 @@ class QueryLog:
                 cached INTEGER,
                 error TEXT
             )""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS feedback (
+                query_id TEXT,
+                rating TEXT,
+                comment TEXT,
+                created_at TEXT
+            )""")
         conn.commit()
+
+    def exists(self, query_id: str) -> bool:
+        row = self.conn.execute("SELECT 1 FROM query_log WHERE query_id=?", (query_id,)).fetchone()
+        return row is not None
+
+    def add_feedback(self, query_id: str, rating: str, comment: str | None = None) -> None:
+        import datetime
+
+        self.conn.execute(
+            "INSERT INTO feedback (query_id, rating, comment, created_at) VALUES (?, ?, ?, ?)",
+            (
+                query_id,
+                rating,
+                comment,
+                datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            ),
+        )
+        self.conn.commit()
 
     def log(self, record: dict) -> None:
         values = []

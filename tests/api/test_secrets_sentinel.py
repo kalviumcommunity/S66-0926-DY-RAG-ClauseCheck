@@ -1,5 +1,4 @@
 """AC-N2.7: the sentinel key never appears in any body, header or log line."""
-
 import logging
 
 from tests.constants import SENTINEL
@@ -14,6 +13,13 @@ def test_sentinel_never_leaks(client, container, caplog):
         ("get", "/suppliers", {}),
         ("get", "/chunks/doc-a:p2:2_1", {}),
         ("get", "/chunks/missing", {}),
+        ("get", "/documents", {}),
+        ("post", "/documents", {"files": {"file": ("a.pdf", b"%PDF")}, "data": {"supplier_id": "S-ACME"}}),
+        ("get", "/documents/jobs/job-1", {}),
+        ("post", "/feedback", {"json": {"query_id": "q-1", "rating": "up"}}),
+        ("get", "/insights/kpis", {}),
+        ("get", "/insights/charts", {}),
+        ("get", "/insights/tables", {}),
         ("get", "/health", {}),
     ]
     seen = []
