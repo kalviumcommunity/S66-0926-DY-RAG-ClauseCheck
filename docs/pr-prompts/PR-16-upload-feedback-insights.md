@@ -1,92 +1,50 @@
-# PR 11 · FastAPI backend, streaming chat and document upload
+# PR 16 · Document upload, feedback and Insights endpoints
 
-**Branch:** `b-api-upload` · **Owner:** Teammate (Generation, Application & Delivery) · **Week:** 5 · **Depends on:** PR 10
+**Branch:** `b-upload-feedback-insights` · **Owner:** Teammate (Generation, Application & Delivery) · **Week:** 5 · **Depends on:** PR 15
 
 ## Context
 
-All the real work happens in FastAPI. The Streamlit frontend (PR 12) only calls these endpoints. This PR exposes:
-- chat, both blocking and **SSE streaming**
-- sessions, suppliers, full-clause lookup
-- document upload with async indexing
-- feedback
-- the FR-12 Insights dashboard data
-- a health check
+PR 15 gave the API its core. This PR adds the rest of the backend surface:
+- **document upload with async indexing**, so a new file becomes answerable without a restart
+- the document listing and job-status endpoints
+- **feedback** (👍/👎) stored against a query
+- the FR-12 **Insights** dashboard data (KPIs, charts, tables)
 
-It also proves that **no secret appears in any response, header or log line** (AC-N2.7).
+It also extends the AC-N2.7 sentinel test so that **every** endpoint is covered.
 
 Read before starting:
-- `docs/architecture/api-design.md`. **It still says `/ask`.** This PR rewrites it to match what is built here, and the paths below win.
+- `docs/architecture/api-design.md` (as rewritten in PR 15)
 - `docs/requirements/functional-requirements.md` (FR-12 Insights dashboard)
-- `docs/requirements/non-functional-requirements.md` NFR-2 (AC-N2.7 sentinel test)
-- `docs/ux/ui-states.md` (stream events and error states)
-- `docs/architecture/tdd.md` §10 (Hugging Face Spaces, port 7860)
+- `docs/requirements/non-functional-requirements.md` NFR-2 (AC-N2.7)
+- `docs/ux/ui-states.md` (upload and error states)
 
 ## Scope (only these files)
 
 | Path | Action |
 |---|---|
-| `clausecheck/api/main.py`, `schemas.py`, `deps.py` | add |
-| `clausecheck/api/routes/__init__.py`, `chat.py`, `sessions.py`, `documents.py`, `catalog.py`, `feedback.py`, `insights.py`, `health.py` | add |
-| `clausecheck/api/container.py` | add |
+| `clausecheck/api/routes/documents.py`, `feedback.py`, `insights.py` | add |
+| `clausecheck/api/main.py`, `clausecheck/api/container.py` | modify: include the new routers, wire `UploadService` |
 | `clausecheck/services/ingestion_service.py` | modify: add `UploadService` |
 | `clausecheck/services/insights_service.py` | add |
 | `clausecheck/store/query_log.py` | modify: feedback table and methods |
 | `clausecheck/core/schema.py` | modify: add `"upload"` to `SOURCES` |
-| `clausecheck/core/config.py`, `.env.example` | modify: see spec |
-| `requirements.txt` | modify: add `fastapi`, `uvicorn[standard]`, `python-multipart`, `httpx` |
-| `tests/api/conftest.py`, `tests/api/test_chat.py`, `test_documents.py`, `test_catalog_health.py`, `test_insights_feedback.py`, `test_secrets_sentinel.py`, `tests/integration/test_upload_service.py` | add |
-| `docs/architecture/api-design.md` | modify: rewrite to the endpoints below |
+| `clausecheck/core/config.py`, `.env.example` | modify: `max_upload_mb: int = 20`, `allowed_types: str = "pdf,html,htm,docx,txt"`, `uploads_dir: Path = Path("data/uploads")` |
+| `requirements.txt` | modify: add `python-multipart` |
+| `tests/api/conftest.py`, `tests/api/test_secrets_sentinel.py` | modify: replace with the versions below |
+| `tests/api/test_documents.py`, `tests/api/test_insights_feedback.py`, `tests/integration/test_upload_service.py` | add |
+| `docs/architecture/api-design.md` | modify: add the endpoints below |
 
 ## Specification
 
-### Settings to add
+### `clausecheck/api/container.py` (changes)
 
-- `max_upload_mb: int = 20`
-- `allowed_types: str = "pdf,html,htm,docx,txt"`
-- `frontend_origin: str = "http://localhost:8501"`
-- `port: int = 7860`
-- `uploads_dir: Path = Path("data/uploads")`
-
-### `clausecheck/api/container.py`
-
-```python
-@dataclass
-class AppContainer:
-    settings: Settings
-    conn: sqlite3.Connection
-    query_service: Any            # .answer(...) / .stream(...)
-    upload_service: Any           # .submit(...) / .get_job(...)
-    sessions: SessionStore
-    query_log: QueryLog
-    vector_count: Callable[[], int] | None = None
-
-    @classmethod
-    def from_settings(cls, settings) -> "AppContainer": ...
-```
-
-`from_settings` opens SQLite and runs `init_db`, builds the embedder, vector store and `QueryService.from_settings` (sharing one `SessionStore`), and builds an `UploadService` whose `on_indexed` callback rebuilds the retriever's BM25 index. It also loads the re-ranker once.
-
-### `clausecheck/api/main.py`
-
-- `create_app(container: AppContainer | None = None) -> FastAPI`:
-  - With a container (tests), use it directly.
-  - Without one, a lifespan builds `AppContainer.from_settings(get_settings())` and calls `setup_logging`.
-  - Store the container in `app.state.container`. `deps.get_container(request)` returns it.
-- Add a `RedactionFilter` built from every `SecretStr` in settings to the `logging.getLogger("clausecheck.api")` logger. All API logging uses that logger.
-- CORS: allow `settings.frontend_origin`.
-- Middleware: an `X-Request-ID` header on every response, using the incoming value or a new uuid4 hex.
-- Global exception handler: returns `500 {"detail": "internal error", "request_id": …}` and logs `"unhandled error"` with the request id and **exception type only** at ERROR level. The exception message and traceback are never logged, because the message can contain secrets.
-- `app = create_app()` at module level is **not** wanted, because it builds real services on import. Provide `def get_app() -> FastAPI` and run with `uvicorn clausecheck.api.main:get_app --factory --port 7860`.
+- `from_settings` now also builds an `UploadService` whose `on_indexed` callback rebuilds the retriever's BM25 index, and assigns it to `upload_service`. This is what makes a new upload answerable without a restart.
+- `main.py` includes the `documents`, `feedback` and `insights` routers.
 
 ### Endpoints
 
 | Method and path | Request | Response |
 |---|---|---|
-| `POST /sessions` | none | `201 {"session_id"}` |
-| `POST /chat` | `{"question": str (1–1000 chars), "session_id": str?, "supplier_id": str?}` | `200 ChatResponse`; `422` on an invalid body |
-| `POST /chat/stream` | same as `/chat` | `200 text/event-stream`. Each event is `event: <type>\ndata: <json>\n\n`, in the order from PR 10. An exception while streaming yields `error {"message": "Something went wrong. Please try again."}` and then `done {"outcome": "error"}` |
-| `GET /suppliers` | none | `200 [{"supplier_id", "display_name", "aliases"}]` |
-| `GET /chunks/{chunk_id}` | none | `200` chunk fields including `text`; `404 {"detail": "chunk not found"}` |
 | `GET /documents` | query `supplier_id?`, `limit=50` (max 200), `cursor?` | `200 {"items": [document rows without path], "next_cursor": str \| null}`, ordered by `doc_id`; the cursor is the last `doc_id` |
 | `POST /documents` | multipart: `file`, `supplier_id` (required), `doc_type` (default `contract`) | `202 {"job_id"}`; `413` over `max_upload_mb`; `415` for a disallowed extension; `409 {"detail": "duplicate", "doc_id"}` for an identical file |
 | `GET /documents/jobs/{job_id}` | none | `200 {"job_id", "status": queued\|running\|done\|failed, "doc_id", "error"}`; `404` |
@@ -94,9 +52,6 @@ class AppContainer:
 | `GET /insights/kpis` | none | `200 {"questions_asked", "answer_rate", "median_time_to_checked_answer_ms", "median_ttft_ms", "citation_accuracy"}` |
 | `GET /insights/charts` | `days=14` | `200 {"outcomes_by_day", "latency_by_day", "questions_by_topic", "documents_by_source"}` |
 | `GET /insights/tables` | none | `200 {"supplier_activity", "unanswered", "evaluation", "coverage"}` |
-| `GET /health` | none | `{"status", "documents", "chunks", "suppliers", "index_version", "checks": {"sqlite", "vector_store", "llm_configured"}}`. `ok`: all checks pass and chunks > 0. `degraded`: chunks = 0 or vector store failing, still 200. `down`: SQLite failing, 503 |
-
-**`ChatResponse`** fields: `query_id`, `answer`, `outcome`, `refusal_reason`, `supplier_id`, `cached`, `unsupported`, `timings`, and `citations: [{"marker", "chunk_id", "doc_id", "page", "section", "clause_no"}]`.
 
 **Insights data** (`services/insights_service.py`, computed from `query_log`, `documents`, `chunks` and the newest `eval/results/*_e2e_*.json`):
 - `answer_rate` = answered ÷ (answered + refused)
@@ -140,6 +95,8 @@ class UploadService:
 - `add_feedback(query_id, rating, comment=None)`
 
 ## Tests
+
+Replace `tests/api/conftest.py` and `tests/api/test_secrets_sentinel.py` with the versions below. They add the fake upload service, `max_upload_mb=1`, `uploads_dir`, and sentinel calls for every endpoint.
 
 ### `tests/api/conftest.py`
 
@@ -243,57 +200,6 @@ def parse_sse(text: str) -> list[tuple[str, dict]]:
     return events
 ```
 
-### `tests/api/test_chat.py`
-
-```python
-from tests.api.conftest import parse_sse
-
-
-def test_sessions(client):
-    r = client.post("/sessions")
-    assert r.status_code == 201 and len(r.json()["session_id"]) == 32
-
-
-def test_chat_answered(client):
-    r = client.post("/chat", json={"question": "Payment terms with Acme?"})
-    assert r.status_code == 200
-    body = r.json()
-    assert body["outcome"] == "answered" and body["citations"][0]["chunk_id"] == "doc-a:p2:2_1"
-    assert {"query_id", "answer", "refusal_reason", "supplier_id", "cached", "unsupported", "timings"} <= body.keys()
-    assert r.headers["x-request-id"]
-
-
-def test_chat_refused(client):
-    body = client.post("/chat", json={"question": "please refuse"}).json()
-    assert body["outcome"] == "refused" and body["citations"] == []
-
-
-def test_chat_validation(client):
-    assert client.post("/chat", json={"question": ""}).status_code == 422
-    assert client.post("/chat", json={"question": "x" * 1001}).status_code == 422
-
-
-def test_stream_event_order(client):
-    r = client.post("/chat/stream", json={"question": "Payment terms with Acme?"})
-    assert r.status_code == 200 and r.headers["content-type"].startswith("text/event-stream")
-    types = [e for e, _ in parse_sse(r.text)]
-    assert types == ["meta", "sources", "token", "token", "citations", "done"]
-
-
-def test_stream_error_event(client, container):
-    container.query_service.fail_with = RuntimeError("provider exploded")
-    events = parse_sse(client.post("/chat/stream", json={"question": "x"}).text)
-    assert [e for e, _ in events][-2:] == ["error", "done"]
-    assert "exploded" not in events[-2][1]["message"]
-    assert events[-1][1]["outcome"] == "error"
-
-
-def test_chat_internal_error_is_generic(client, container):
-    container.query_service.fail_with = RuntimeError("provider exploded")
-    r = client.post("/chat", json={"question": "x"})
-    assert r.status_code == 500 and r.json()["detail"] == "internal error" and "request_id" in r.json()
-```
-
 ### `tests/api/test_documents.py`
 
 ```python
@@ -334,34 +240,6 @@ def test_list_documents_hides_path(client):
     body = client.get("/documents").json()
     assert [d["doc_id"] for d in body["items"]] == ["doc-a"]
     assert "path" not in body["items"][0] and body["next_cursor"] is None
-```
-
-### `tests/api/test_catalog_health.py`
-
-```python
-def test_suppliers(client):
-    assert client.get("/suppliers").json() == [
-        {"supplier_id": "S-ACME", "display_name": "Acme Corp", "aliases": ["Acme"]}]
-
-
-def test_chunk_found_and_missing(client):
-    r = client.get("/chunks/doc-a:p2:2_1")
-    assert r.status_code == 200 and r.json()["text"] and r.json()["page"] == 2
-    assert client.get("/chunks/missing").status_code == 404
-
-
-def test_health_ok(client):
-    body = client.get("/health").json()
-    assert body["status"] == "ok"
-    assert (body["documents"], body["chunks"], body["suppliers"]) == (1, 1, 1)
-    assert body["checks"] == {"sqlite": True, "vector_store": True, "llm_configured": True}
-
-
-def test_health_degraded_without_chunks(client, container):
-    container.conn.execute("DELETE FROM chunks")
-    container.conn.commit()
-    r = client.get("/health")
-    assert r.status_code == 200 and r.json()["status"] == "degraded"
 ```
 
 ### `tests/api/test_insights_feedback.py`
@@ -476,22 +354,18 @@ def test_upload_indexes_document_and_rejects_duplicate(tmp_path, fixture_paths):
 ## Manual checks
 
 1. Run `pytest -q`. Every test should pass, including the sentinel test.
-2. Run `uvicorn clausecheck.api.main:get_app --factory --port 7860` and open `http://localhost:7860/docs`. Every endpoint should be listed.
-3. Run `curl -s localhost:7860/health | python -m json.tool`. Expect `"status": "ok"` with real counts.
-4. Run:
-   ```bash
-   curl -N -X POST localhost:7860/chat/stream -H "Content-Type: application/json" \
-     -d '{"question":"What are the payment terms with <real supplier>?"}'
-   ```
-   Events should arrive live, in the order `meta`, `sources`, `token`…, `citations`, `done`.
-5. Upload a document that no existing chunk can answer:
+2. Open `http://localhost:7860/docs`. **Every** endpoint from PR 15 and this PR should be listed.
+3. Upload a document that no existing chunk can answer:
    ```bash
    curl -F file=@my_test.txt -F supplier_id=S-TEST -F doc_type=certificate localhost:7860/documents
    ```
    Poll `/documents/jobs/<id>` until `done`, then ask a question only that file answers. It should be answered with a citation to it, with no restart.
-6. Upload the same file again. Expect `409`.
-7. Check the server log while doing all of the above. No key should appear, and errors should show only a request id and the exception type.
+4. Upload the same file again. Expect `409`.
+5. Upload a `.exe` (expect `415`) and a file over `MAX_UPLOAD_MB` (expect `413`).
+6. Send feedback with curl, then run `sqlite3 index/clausecheck.db "SELECT * FROM feedback;"`. The row should be there.
+7. Run `curl -s localhost:7860/insights/kpis | python -m json.tool`, and the same for `/insights/charts` and `/insights/tables`. The keys should match the spec exactly.
+8. Check the server log while doing all of the above. No key should appear, and errors should show only a request id and the exception type.
 
 ## Definition of done
 
-Every endpoint works and is documented in `api-design.md`, uploads become answerable without a restart, the sentinel test passes, and every test passes.
+Uploads become answerable without a restart, feedback and the Insights data endpoints work, every endpoint is documented in `api-design.md`, the sentinel test covers every endpoint, and every test passes.

@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     llm_timeout_seconds: float = 30.0
     llm_max_retries: int = 3
     llm_retry_wait_seconds: float = 1.0
+    gen_temperature: float = 0.0
 
     # Logging
     log_level: str = "INFO"
