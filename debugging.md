@@ -25,15 +25,19 @@ cited answer, with uploads and amendments handled.
 - **Index:** 167 documents, 8,288 chunks, 8,288 vectors (158 corpus documents + uploads).
 
 ### How to run it
+The full, step-by-step version is in [README.md](README.md). In short:
 ```bash
 pip install -e . -r requirements.txt && pip install sentence-transformers==6.2.0
-cp .env.example .env        # then fill GEMINI_API_KEY and GROQ_API_KEY; .env is git-ignored
+cp .env.example .env   # set GEMINI_API_KEY, GROQ_API_KEY and EMBED_PROVIDER=local (the example
+                       # file says gemini); .env is git-ignored
 python scripts/fetch_sources.py            # corpus, manifest, suppliers
-python -m clausecheck.ingest --rebuild     # SQLite, BM25 and local vectors
+python -m clausecheck.ingest               # SQLite, BM25 and local vectors
 uvicorn clausecheck.api.main:get_app --factory --port 7860
 streamlit run frontend/app.py              # in a second terminal
 ```
-After rebuilding the index or changing `RELEVANCE_THRESHOLD`, clear the cache:
+Use `--rebuild` only to change the embedding model: it deletes the whole vector store and
+re-indexes only the corpus, so uploaded documents must be uploaded again (2.37). After rebuilding
+the index or changing `RELEVANCE_THRESHOLD`, clear the cache:
 `sqlite3 index/clausecheck.db "DELETE FROM answer_cache;"` (see 2.16 and 2.27).
 
 ### Measured for v1 (40 `tune` questions, real models, cache off)
@@ -540,6 +544,28 @@ does not know without the pydantic plugin.
   corpus download in `fetch_sources.py`, run time), and the 7.3 s median is above the 3 s target
   (this run also shared the machine with the test suite, and several questions include a cold
   model load).
+
+### 2.37 README rewritten for version 1: **Done**
+- The README still described the old setup (Gemini as the main model, no local embeddings, no
+  commands for the API or the app). It now has the project description, how an answer is produced,
+  the data, exact local run commands (install, `.env`, `fetch_sources.py`, `ingest`, `uvicorn`,
+  `streamlit run frontend/app.py`), usage notes, settings, maintenance, tests, troubleshooting and
+  the known limits. Committed as `f64e33f`.
+- Checked before writing: `--help` on the ingest, fetch and eval commands; Streamlit started
+  headless on a spare port and served the page (`/_stcore/health` returned `ok`); the API commands
+  are the ones used throughout this log. Not checked: a full install from a fresh clone.
+- Corrections made while writing it, from reading the code:
+  - Conversation history (`SessionStore`) is in memory, so it is lost when the backend restarts;
+    it is not in SQLite.
+  - The Insights tab does not show thumbs-up/down feedback; feedback is saved in the `feedback`
+    table only.
+  - `ingest --rebuild` calls `VectorStore.reset()`, which deletes the whole collection, and
+    re-ingests only `data/manifest.csv`. Uploaded documents stay in SQLite but lose their vectors
+    (keyword search still finds them), so they must be uploaded again. The README therefore uses
+    plain `python -m clausecheck.ingest` for first setup. The "How to run it" section above said
+    `--rebuild` and omitted `EMBED_PROVIDER=local`; both are corrected.
+- Left as is: `.env.example` still has `EMBED_PROVIDER=gemini`, so the README tells readers to
+  change it to `local`.
 
 ## 3. Verification
 
