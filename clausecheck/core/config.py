@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     llm_retry_wait_seconds: float = 1.0
     gen_temperature: float = 0.0
 
+    # Context building and relevance gate (PR 10)
+    context_token_budget: int = 3000
+    relevance_threshold: float = 0.0
+
     # Logging
     log_level: str = "INFO"
 
