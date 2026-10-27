@@ -1,0 +1,25 @@
+# Secrets and local config
+.env
+frontend/.streamlit/secrets.toml
+
+# OS junk
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Generated index
+index/
+
+# Data (keep the folders, ignore the contents)
+data/raw/*
+!data/raw/.gitkeep
+data/uploads/*
+!data/uploads/.gitkeep

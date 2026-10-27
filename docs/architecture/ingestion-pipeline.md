@@ -2,7 +2,7 @@
 
 Sprint 2, Simulated Work (AI Application Development with RAG)
 Repo: `FirstName_ClauseCheck_Kalvium-Community`
-See also: `rag-architecture-design.md` (sections 6.1–6.2), `tdd.md` (sections 5.1–5.2, 7.2), `data-sourcing.md` (sections 9–11), `functional-requirements.md` (FR-1, FR-2), `data-flow.md` (section 2)
+See also: [rag-architecture-design.md](rag-architecture-design.md) (sections 6.1–6.2), [tdd.md](tdd.md) (sections 5.1–5.2, 7.2), [data-sourcing.md](../data/data-sourcing.md) (sections 9–11), [functional-requirements.md](../requirements/functional-requirements.md) (FR-1, FR-2), [data-flow.md](data-flow.md) (section 2)
 
 | | |
 |---|---|
@@ -13,7 +13,7 @@ See also: `rag-architecture-design.md` (sections 6.1–6.2), `tdd.md` (sections 
 | **Covers** | Loaders per format, table extraction, cleaning, validation |
 | **Does not cover** | Clause chunking (FR-3), embedding (NFR-4), indexing. These start where this document ends: at a validated `CleanDocument`. |
 
-If this document disagrees with `rag-architecture-design.md`, the RAG design wins and this document is updated. Section 13 lists the places where earlier drafts disagreed and how this document resolves them.
+If this document disagrees with [rag-architecture-design.md](rag-architecture-design.md), the RAG design wins and this document is updated. Section 13 lists the places where earlier drafts disagreed and how this document resolves them.
 
 ---
 
@@ -45,10 +45,10 @@ Three rules shape every design choice below:
 | Rule | Why | Enforced by |
 |---|---|---|
 | **Never change a value.** Numbers, currency symbols, dates, ranges (`500–999`), SKU codes and clause numbering leave cleaning byte-for-byte identical. | Buyers act on exact values; a cleaner that "tidies" `forty-five (45)` or turns `–` into `-` silently breaks exact-value answers. | Protected-token invariant (7.8), AC-1.5, AC-2.2 |
-| **Fail loudly, per document.** A bad file fails on its own; it never stops the run, and it never lands half-indexed. | NFR-3 reproducibility; one broken EDGAR exhibit must not block 199 good contracts. | Issue model (section 9), indexer transaction (`tdd.md` 13) |
+| **Fail loudly, per document.** A bad file fails on its own; it never stops the run, and it never lands half-indexed. | NFR-3 reproducibility; one broken EDGAR exhibit must not block 199 good contracts. | Issue model (section 9), indexer transaction ([tdd.md](tdd.md) 13) |
 | **Same input, same output.** Loaders and cleaner are deterministic and versioned. | Re-running ingest on an unchanged manifest must create 0 chunks and 0 embedding calls (AC-1.9). | `sha256` skip, `LOADER_VERSION`, `CLEANER_VERSION` |
 
-Module layout (from `tdd.md` section 17):
+Module layout (from [tdd.md](tdd.md) section 17):
 
 ```text
 clausecheck/ingest/
@@ -186,7 +186,7 @@ class Issue(BaseModel):
     page: int | None = None
 ```
 
-**Why a page map instead of inline page markers.** `data-flow.md` mentions keeping page markers in the text. Markers would be embedded, BM25-indexed and shown to the LLM as if they were contract text. A side table of offsets gives the chunker the same information (`page_start`, `page_end` per chunk, AC-1.4) without polluting chunk text.
+**Why a page map instead of inline page markers.** [data-flow.md](data-flow.md) mentions keeping page markers in the text. Markers would be embedded, BM25-indexed and shown to the LLM as if they were contract text. A side table of offsets gives the chunker the same information (`page_start`, `page_end` per chunk, AC-1.4) without polluting chunk text.
 
 **Why table anchors.** A table is removed from the flowing text and replaced by a single line `[[TABLE:t3]]` at the position where it appeared. The chunker turns each anchor into a table chunk and uses the text immediately before the anchor to find the preceding heading (AC-2.3). The anchor itself never reaches a chunk.
 
@@ -222,7 +222,7 @@ Every rule produces a `REJECT` with its own code. A rejected row is written to t
 | `empty_file` | size = 0 | fail |
 | `mime_mismatch` | `python-magic` MIME is not compatible with `format` (table below) | fail |
 | `docx_zip_bomb` | DOCX uncompressed size > `DOCX_MAX_UNCOMPRESSED_MB` (100 MB) or > 1,000 zip entries | fail |
-| `vendor_hash_changed` | vendor document's sha256 differs from `fetch_log.csv` | warn; file is **not** replaced silently (`data-sourcing.md` 6.4) |
+| `vendor_hash_changed` | vendor document's sha256 differs from `fetch_log.csv` | warn; file is **not** replaced silently ([data-sourcing.md](../data/data-sourcing.md) 6.4) |
 
 | `format` | Accepted MIME types |
 |---|---|
@@ -317,7 +317,7 @@ def _page_text(page, table_boxes: dict[str, Rect]) -> str:
 | some, but ≤ 50%, of pages are below the threshold | warn `low_text_pages` with the page list (signature pages, blank pages and image-only exhibits are normal) |
 | `(cid:NN)` sequences or U+FFFD make up more than `GARBLED_RATIO` (5%) of characters | fail `garbled_text` (font without a usable ToUnicode map; text would be meaningless to embed) |
 
-**Why PyMuPDF for text and pdfplumber only for tables.** PyMuPDF is several times faster on the ~150 CUAD PDFs and preserves reading order well with `sort=True`. pdfplumber's table finder is better than PyMuPDF's on ruled price tables, which is the one thing we need it for. This split is what `rag-architecture-design.md` 6.2 specifies.
+**Why PyMuPDF for text and pdfplumber only for tables.** PyMuPDF is several times faster on the ~150 CUAD PDFs and preserves reading order well with `sort=True`. pdfplumber's table finder is better than PyMuPDF's on ruled price tables, which is the one thing we need it for. This split is what [rag-architecture-design.md](rag-architecture-design.md) 6.2 specifies.
 
 ### 5.4 HTML loader (`loaders/html.py`)
 
@@ -622,7 +622,7 @@ Cleaned pages are joined with `\n\n`. While joining, the cleaner records `(start
 
 ## 8. Stage 4: post-load validation
 
-These checks run on the `CleanDocument`. They implement the quality gates in `data-sourcing.md` section 11 for documents arriving through the pipeline (including uploads, which never went through the sourcing review).
+These checks run on the `CleanDocument`. They implement the quality gates in [data-sourcing.md](../data/data-sourcing.md) section 11 for documents arriving through the pipeline (including uploads, which never went through the sourcing review).
 
 | Check | Rule | Severity | Code |
 |---|---|---|---|
@@ -677,7 +677,7 @@ These checks run on the `CleanDocument`. They implement the quality gates in `da
 
 ## 10. Ingestion report
 
-Every run writes `reports/ingestion/<run_id>.json` and a readable `reports/ingestion/<run_id>.md` (AC-1.10). The Markdown version is what goes into the daily journal.
+Every run writes `reports/ingestion/<run_id>.json` and a readable `reports/ingestion/<run_id>.md` (AC-1.10). The Markdown version is what goes into the PR description.
 
 ```json
 {
@@ -710,7 +710,7 @@ The Markdown report shows, in order: totals; a per-format and per-source table; 
 
 ## 11. Configuration
 
-New settings introduced by this document, loaded with `pydantic-settings` alongside those in `rag-architecture-design.md` section 11. All are written into the report so a run can be reproduced.
+New settings introduced by this document, loaded with `pydantic-settings` alongside those in [rag-architecture-design.md](rag-architecture-design.md) section 11. All are written into the report so a run can be reproduced.
 
 | Setting | Default | Used in |
 |---|---|---|
@@ -731,7 +731,7 @@ New settings introduced by this document, loaded with `pydantic-settings` alongs
 | `LANG_MIN_CONFIDENCE` | 0.9 | 8 |
 | `CLEAN_MIN_RATIO` | 0.7 | 8 |
 
-**CLI** (extends `tdd.md` 5.1):
+**CLI** (extends [tdd.md](tdd.md) 5.1):
 
 ```bash
 python -m clausecheck.ingest --manifest data/manifest.csv --rebuild      # full run
@@ -798,14 +798,14 @@ CI runs the unit tests on every PR, and `--validate-only` on every PR that chang
 
 | Topic | Earlier text | This document | Basis |
 |---|---|---|---|
-| PDF text library | `data-flow.md`: pdfplumber for text | PyMuPDF for text, pdfplumber for tables only | `rag-architecture-design.md` 6.2, `tdd.md` 5.2 |
-| HTML page numbers | `tdd.md` 5.2: approximate pages every ~3,000 chars | no page numbers for HTML or TXT | decision D3, AC-1.4 |
-| Page markers in text | `data-flow.md` 2.3: keep a page marker in the text | side-table `page_map`, no markers in text | keeps markers out of embeddings and prompts (section 3) |
-| `chunk_id` separator | `data-flow.md`: `acme-msa-2023__7.2__0` | `ACME-MSA-2021::7.2::0` (chunker's concern, noted for consistency) | `tdd.md` 5.3, `rag-architecture-design.md` 5.1 |
-| Ingest entry point | `data-flow.md`: `python -m ingest.run` | `python -m clausecheck.ingest` | `tdd.md` 5.1, `data-sourcing.md` 10 |
+| PDF text library | [data-flow.md](data-flow.md): pdfplumber for text | PyMuPDF for text, pdfplumber for tables only | [rag-architecture-design.md](rag-architecture-design.md) 6.2, [tdd.md](tdd.md) 5.2 |
+| HTML page numbers | [tdd.md](tdd.md) 5.2: approximate pages every ~3,000 chars | no page numbers for HTML or TXT | decision D3, AC-1.4 |
+| Page markers in text | [data-flow.md](data-flow.md) 2.3: keep a page marker in the text | side-table `page_map`, no markers in text | keeps markers out of embeddings and prompts (section 3) |
+| `chunk_id` separator | [data-flow.md](data-flow.md): `acme-msa-2023__7.2__0` | `ACME-MSA-2021::7.2::0` (chunker's concern, noted for consistency) | [tdd.md](tdd.md) 5.3, [rag-architecture-design.md](rag-architecture-design.md) 5.1 |
+| Ingest entry point | [data-flow.md](data-flow.md): `python -m ingest.run` | `python -m clausecheck.ingest` | [tdd.md](tdd.md) 5.1, [data-sourcing.md](../data/data-sourcing.md) 10 |
 | Skip key | sha256 only | sha256 + loader/cleaner/chunker versions | a parsing fix must re-process affected files (4.3) |
 
-`data-flow.md` should be updated to match the first five rows in the same PR that adds this document.
+[data-flow.md](data-flow.md) should be updated to match the first five rows in the same PR that adds this document.
 
 ---
 

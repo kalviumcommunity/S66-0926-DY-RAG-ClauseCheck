@@ -2,7 +2,7 @@
 
 Sprint 2, Simulated Work (AI Application Development with RAG)
 Repo: `FirstName_ClauseCheck_Kalvium-Community`
-See also: `01-project-overview.md`, `02-project-description.md`, `data-sourcing.md`, `tdd.md`, `rag-architecture-design.md`
+See also: [01-project-overview.md](../01-project-overview.md), [02-project-description.md](../02-project-description.md), [data-sourcing.md](../data/data-sourcing.md), [tdd.md](../architecture/tdd.md), [rag-architecture-design.md](../architecture/rag-architecture-design.md)
 Status: draft, submitted alongside the RAG architecture design.
 
 This document turns the five-week timeline (project description, section 10; TDD, section 19) into a week-by-week, day-by-day build plan. For each week it lists the goal, what must be true before the week starts, the tasks, the deliverables, the eval numbers to record, and the exit gate that must pass before the next week begins.
@@ -31,7 +31,7 @@ Where the TDD and the RAG architecture design differ, this plan follows the RAG 
 
 ## 1. How to use this plan
 
-- Each week has an **exit gate**. The next week's work starts only when the gate passes, or when the team records in the journal why it is proceeding anyway and what is carried over.
+- Each week has an **exit gate**. The next week's work starts only when the gate passes, or when the team records in the PR description why it is proceeding anyway and what is carried over.
 - Day numbers (D1 to D5) are a guide, not a contract. Tasks within a week can move between days; tasks should not move between weeks without updating this document.
 - Every task maps to a GitHub issue on the Kanban board. Issue titles start with the week and workstream, e.g. `W3-B: RRF fusion`.
 - Building (Phase 4 onward) starts only after the PRD and the RAG architecture design are approved. Week 1 and the first part of week 2 are planning and data work only.
@@ -110,9 +110,9 @@ Workstreams overlap deliberately: D builds the config, LLM client and CI in week
 |---|---|
 | Start of day | 15-minute stand-up: yesterday, today, blockers. Kanban board updated. |
 | During the day | Work on a branch named `w{week}-{workstream}-{short-name}`, e.g. `w3-b-rrf-fusion`. |
-| End of day | At least one PR per person (daily PR requirement), and a journal entry in `docs/journal/YYYY-MM-DD.md`. |
+| End of day | At least one PR per person (daily PR requirement). |
 
-Each journal entry records: what was done, PRs opened or merged, any eval numbers produced (with index version, prompt version and parameters), blockers, and the plan for the next day.
+Eval numbers go in the PR description, with the index version, prompt version and parameters used.
 
 ### 4.2 Weekly
 
@@ -120,7 +120,7 @@ Each journal entry records: what was done, PRs opened or merged, any eval number
 |---|---|
 | D1 | Week kick-off: confirm the previous exit gate, assign this week's issues |
 | D3 | Mid-week check: are we on track for the exit gate? Move work or trigger the cut list (section 14) if not |
-| D5 | Full eval run (from week 3 onward), weekly review with the mentor, exit-gate decision recorded in the journal |
+| D5 | Full eval run (from week 3 onward), weekly review with the mentor, exit-gate decision recorded in the PR description |
 
 ### 4.3 Definition of done (every task)
 
@@ -128,7 +128,7 @@ A task is done when:
 
 1. its PR is reviewed and merged into `main`;
 2. its unit tests pass in CI (lint, unit, integration with the LLM mocked);
-3. the related eval number, if any, is written in that day's journal;
+3. the related eval number, if any, is written in the PR description;
 4. any config it adds is in `.env.example`, and any decision it makes is reflected in the design documents.
 
 ### 4.4 Rules that apply all sprint
@@ -163,7 +163,7 @@ A task is done when:
 - `scripts/fetch_sources.py`, `scripts/generate_synthetic.py` (seeded)
 - `core/config.py`, `llm/client.py` skeleton, `.env.example`
 - PRD and mock UX submitted
-- Data sourcing document (`data-sourcing.md`) submitted
+- Data sourcing document ([data-sourcing.md](../data/data-sourcing.md)) submitted
 
 ### 5.3 Corpus targets to check on D5
 
@@ -197,7 +197,7 @@ A task is done when:
 | Day | A: Data & ingestion | B: Retrieval | C: Generation & eval | D: App & platform |
 |---|---|---|---|---|
 | D1 | **RAG design review.** Address comments; record decisions D1–D6. Building starts after approval. | (review) | (review) | (review) |
-| D2 | `ingest/loaders.py`: PDF (PyMuPDF text, pdfplumber tables → Markdown), TXT (chardet fallback) | Collect 30 real clause headings from the corpus as test fixtures for the heading regex | Start `eval/questions.jsonl`: CUAD questions from `master_clauses.csv` using the label mapping in `data-sourcing.md` 4.4 | `store/sqlite.py`: schema from TDD 7.4 (documents, chunks, suppliers, aliases, ingestion_jobs, logs, cache) |
+| D2 | `ingest/loaders.py`: PDF (PyMuPDF text, pdfplumber tables → Markdown), TXT (chardet fallback) | Collect 30 real clause headings from the corpus as test fixtures for the heading regex | Start `eval/questions.jsonl`: CUAD questions from `master_clauses.csv` using the label mapping in [data-sourcing.md](../data/data-sourcing.md) 4.4 | `store/sqlite.py`: schema from TDD 7.4 (documents, chunks, suppliers, aliases, ingestion_jobs, logs, cache) |
 | D3 | Loaders: HTML (BeautifulSoup, strip script/style/nav/footer), DOCX (paragraphs, heading styles, tables); `ingest/cleaner.py` (headers, footers, hyphenation, whitespace; never touches numbers) | `ingest/chunker.py`: heading regex, character-offset → page map | Exact-value questions from synthetic ground truth, including tier boundaries | `tests/fixtures/`: 5 small sample contracts; unit-test scaffolding |
 | D4 | Table chunks: header row repeated on every part; `has_redaction` flag for `[***]` markers | Chunk sizing: merge < 60 tokens, single chunk ≤ 512, 400/60 windows with heading prefix; page-based fallback when < 3 headings; `chunk_id` format | Amendment questions with trap chunks; redacted-value questions; unanswerable questions (unknown suppliers, hand-checked absent clauses) | `python -m clausecheck.ingest` CLI: `--manifest`, `--rebuild`, `--only-supplier`, `--dry-run`; sha256 change detection |
 | D5 | Run full `--dry-run`; produce ingestion report (per-source counts, failures, flagged docs, redaction counts) | Chunk-size histogram; fix regex misses found in the report | Map CUAD character offsets to `gold_chunk_ids`; split eval set into tuning (~60%) and held-out (~40%) | Integration test: ingest the 5 fixtures, check every metadata field is filled |
@@ -211,7 +211,7 @@ A task is done when:
 - First ingestion report and chunk-size histogram
 - `eval/questions.jsonl` draft with gold chunk IDs, split into tuning and held-out
 
-### 6.3 Checks to record in the journal
+### 6.3 Checks to record in the PR description
 
 | Check | Target |
 |---|---|
@@ -321,7 +321,7 @@ If recall@20 is high but recall@5 is low, the problem is re-ranking; if recall@2
 - [ ] Amendment questions state the amended term and never the trap value alone
 - [ ] Redacted-value questions answered as "redacted in the filed copy" with a citation
 - [ ] Unknown-supplier and aggregation questions make no LLM call
-- [ ] Threshold, prompt version and index version recorded in the journal
+- [ ] Threshold, prompt version and index version recorded in the PR description
 
 ---
 
@@ -339,7 +339,7 @@ If recall@20 is high but recall@5 is low, the problem is re-ranking; if recall@2
 | D2 | Upload rebuilds affected BM25 (supplier + global) and bumps `index_version` | `store/cache.py`: answer cache keyed by query, supplier, index and prompt versions; 7-day TTL; cached answers replayed as SSE | API tests: response shape, SSE event order, error codes | UI: sources expanders, full-clause view, refusal `st.info` box, unsupported-number warning, synthetic/standard-terms labels, "not legal advice" note |
 | D3 | `scripts/bootstrap.py`: restore index zip if `/data/chroma` missing, rebuild BM25 | JSON stdout logs with request ID and stage timings; rate limit 30/min per IP; CORS | Measure TTFT p50/p95 on the streaming path; apply latency fixes in order if p50 > 3 s (RAG design 13.1) | Dockerfile (re-ranker baked in); deploy backend to Hugging Face Spaces; frontend to Streamlit Community Cloud |
 | D4 | CI: build index zip on `main`, attach to release; 10-question eval smoke test with real API | `docs/qa.md` manual checklist: follow-ups, refusals, upload, streaming, cancellation | **Final eval on held-out split**; eval report with ablations, threshold curves, latency | Deploy fixes; confirm keys only in Space and Streamlit secrets; Render as backup if Spaces is unreliable |
-| D5 | README: setup, seeds, one-command rebuild, deployment, limitations | Record concept walkthrough videos | Final journal and eval summary | **Final submission** (checklist in section 15) |
+| D5 | README: setup, seeds, one-command rebuild, deployment, limitations | Record concept walkthrough videos | Final eval summary | **Final submission** (checklist in section 15) |
 
 ### 9.2 Deliverables
 
@@ -369,7 +369,7 @@ If recall@20 is high but recall@5 is low, the problem is re-ranking; if recall@2
 | Milestone | Week / day | Evidence | Reviewer |
 |---|---|---|---|
 | M1: PRD and mock UX submitted | W1 D5 | PRD, mock UX, data sourcing document | Mentor |
-| M2: RAG architecture design approved | W2 D1 | Signed approval table in `rag-architecture-design.md` | Mentor |
+| M2: RAG architecture design approved | W2 D1 | Signed approval table in [rag-architecture-design.md](../architecture/rag-architecture-design.md) | Mentor |
 | M3: Corpus ingested | W2 D5 | Ingestion report, chunk histogram | Team |
 | M4: Retrieval target met | W3 D5 | Recall@5 ≥ 0.85, ablation table | Mentor (weekly review) |
 | M5: Grounded answers target met | W4 D5 | Answer eval report on tuning split | Mentor (weekly review) |
@@ -509,10 +509,10 @@ The sprint also keeps half a day of buffer on W5 D5 afternoon; it is not planned
 - [ ] Ingestion and indexing reproducible from a clean clone (verified in CI)
 
 **Documents**
-- [ ] `01-project-overview.md`, `02-project-description.md`
+- [ ] [01-project-overview.md](../01-project-overview.md), [02-project-description.md](../02-project-description.md)
 - [ ] PRD and mock UX
-- [ ] `data-sourcing.md`
-- [ ] `rag-architecture-design.md` (approved) and `tdd.md` updated with the changes in its section 17
+- [ ] [data-sourcing.md](../data/data-sourcing.md)
+- [ ] [rag-architecture-design.md](../architecture/rag-architecture-design.md) (approved) and [tdd.md](../architecture/tdd.md) updated with the changes in its section 17
 - [ ] `development-plan.md` (this document), updated with actual dates and any re-planning
 - [ ] `docs/qa.md` with the manual checklist completed
 
@@ -522,5 +522,5 @@ The sprint also keeps half a day of buffer on W5 D5 afternoon; it is not planned
 - [ ] Ablation table, threshold curves, latency numbers, judge agreement
 
 **Process**
-- [ ] Daily PRs and journal entries for every day of the sprint
+- [ ] Daily PRs for every day of the sprint
 - [ ] Concept walkthrough videos recorded

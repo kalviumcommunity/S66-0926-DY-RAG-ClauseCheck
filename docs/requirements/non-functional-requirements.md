@@ -2,13 +2,13 @@
 
 Sprint 2, Simulated Work (AI Application Development with RAG)
 Repo: `FirstName_ClauseCheck_Kalvium-Community`
-See also: `PRD.md` (section 9.2 lists NFR-1 to NFR-8), `functional-requirements.md`, `rag-architecture-design.md` (sections 11, 13, 14), `tdd.md` (sections 10, 13, 14), `development-plan.md`
+See also: [PRD.md](PRD.md) (section 9.2 lists NFR-1 to NFR-8), [functional-requirements.md](functional-requirements.md), [rag-architecture-design.md](../architecture/rag-architecture-design.md) (sections 11, 13, 14), [tdd.md](../architecture/tdd.md) (sections 10, 13, 14), [development-plan.md](../planning/development-plan.md)
 Version: 1.0, 2026-10-01
 Status: submitted with the PRD for M1 review.
 
-This document expands NFR-1 to NFR-5 in `PRD.md` section 9.2 into **testable acceptance criteria**. NFR-6 (failing safely), NFR-7 (upload safety) and NFR-8 (clear labelling) are already covered by criteria in `functional-requirements.md` (AC-5.11, AC-7.7, AC-9.2, AC-9.9, AC-10.8, AC-10.11) and get their own document only if the mentor asks for one.
+This document expands NFR-1 to NFR-5 in [PRD.md](PRD.md) section 9.2 into **testable acceptance criteria**. NFR-6 (failing safely), NFR-7 (upload safety) and NFR-8 (clear labelling) are already covered by criteria in [functional-requirements.md](functional-requirements.md) (AC-5.11, AC-7.7, AC-9.2, AC-9.9, AC-10.8, AC-10.11) and get their own document only if the mentor asks for one.
 
-The same precedence rules apply as for the functional requirements: if this document disagrees with the PRD on scope or targets, the PRD wins. If it disagrees with `rag-architecture-design.md` on a mechanism or parameter, the design wins, and this document is updated.
+The same precedence rules apply as for the functional requirements: if this document disagrees with the PRD on scope or targets, the PRD wins. If it disagrees with [rag-architecture-design.md](../architecture/rag-architecture-design.md) on a mechanism or parameter, the design wins, and this document is updated.
 
 | Version | Date | Change | Approved by |
 |---|---|---|---|
@@ -43,7 +43,7 @@ Every NFR has the same three parts as the functional requirements:
 
 ### 1.2 Verification methods
 
-The codes from `functional-requirements.md` section 1.2 apply, plus two more that non-functional checks need:
+The codes from [functional-requirements.md](functional-requirements.md) section 1.2 apply, plus two more that non-functional checks need:
 
 | Code | Method | Where it lives |
 |---|---|---|
@@ -67,7 +67,7 @@ An NFR is done when:
 
 ### 1.4 Parameters
 
-Criteria quote the **default** values from `rag-architecture-design.md` section 11 and `tdd.md` section 14.1. New parameters introduced here (marked *new*) are added to `.env.example` and to the parameter register when this document is approved.
+Criteria quote the **default** values from [rag-architecture-design.md](../architecture/rag-architecture-design.md) section 11 and [tdd.md](../architecture/tdd.md) section 14.1. New parameters introduced here (marked *new*) are added to `.env.example` and to the parameter register when this document is approved.
 
 | Parameter | Default | Source |
 |---|---|---|
@@ -110,7 +110,7 @@ Workstreams: **A** corpus and ingestion, **B** retrieval, **C** generation and e
 
 ### Latency budget
 
-From `rag-architecture-design.md` section 13.1. The budget is diagnostic: only the total is a gate.
+From [rag-architecture-design.md](../architecture/rag-architecture-design.md) section 13.1. The budget is diagnostic: only the total is a gate.
 
 | Stage | Logged as | Budget (p50) |
 |---|---|---|
@@ -213,7 +213,7 @@ Time from question to opening a cited clause (KPI-01, usability session, AC-10.1
 |---|---|---|
 | AC-N2.10 | On the deployed backend, keys are read from Hugging Face Space secrets, not from a file in the image. `docker history` and the image filesystem contain no `.env`. | DEP (W5 D4 checklist) |
 | AC-N2.11 | Jobs that use API keys (eval smoke test, index build) run only on pushes to `main`, never on pull requests from forks, and never print environment variables. | CI (workflow review) |
-| AC-N2.12 | If a key is ever found in a commit, log or screenshot, it is revoked and replaced the same day, and the event is recorded in the team journal. Removing it from history alone is not enough. | QA (runbook in `docs/qa.md`) |
+| AC-N2.12 | If a key is ever found in a commit, log or screenshot, it is revoked and replaced the same day, and the event is recorded in the PR description. Removing it from history alone is not enough. | QA (runbook in `docs/qa.md`) |
 
 ### Not covered
 
@@ -412,7 +412,7 @@ Several of these requirements pull against each other. The design choices above 
 
 ### 9.2 Delivery by week
 
-From `development-plan.md` section 12.
+From [development-plan.md](../planning/development-plan.md) section 12.
 
 | NFR | W1 | W2 | W3 | W4 | W5 |
 |---|---|---|---|---|---|

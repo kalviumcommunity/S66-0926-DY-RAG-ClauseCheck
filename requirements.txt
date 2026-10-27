@@ -1,0 +1,13 @@
+# Runtime
+pydantic==2.14.1
+pydantic-settings==2.16.1
+python-dotenv==1.2.4
+
+# Dev
+pytest==9.1.1
+pytest-cov==7.1.0
+ruff==0.17.2
+black==26.10.1
+pre-commit==4.7.0
+detect-secrets==1.5.0
+nbstripout==0.9.1

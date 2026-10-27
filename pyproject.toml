@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "clausecheck"
+requires-python = ">=3.11"
+dynamic = ["version"]
+
+[tool.setuptools.dynamic]
+version = { attr = "clausecheck.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["clausecheck*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+# PR-01 test files are kept verbatim from the brief
+"tests/unit/test_repo_layout.py" = ["E501", "E741"]
+
+[tool.black]
+line-length = 100
+# PR-01 test files are kept verbatim from the brief
+extend-exclude = "tests/unit/test_(smoke|repo_layout)\\.py"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-ra"
+markers = [
+    "e2e: needs a running deployment (skipped unless CLAUSECHECK_E2E=1)",
+    "targets: corpus size targets",
+    "slow: downloads models",
+]
