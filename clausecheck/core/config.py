@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     context_token_budget: int = 3000
     relevance_threshold: float = 0.0
 
+    # Sessions, cache and query log (PR 12)
+    history_turns: int = 3
+    cache_ttl_seconds: int = 86400
+
     # Logging
     log_level: str = "INFO"
 
