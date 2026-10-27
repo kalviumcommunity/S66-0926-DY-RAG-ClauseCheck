@@ -74,27 +74,15 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-      - run: pip install -e . -r requirements.txt
+      # embeddings run on the runner (no API quota); it needs PyTorch, which requirements.txt omits
+      - run: pip install -e . -r requirements.txt sentence-transformers==6.2.0
       - name: Ten tuning questions against the real APIs
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          EDGAR_USER_AGENT: ${{ secrets.EDGAR_USER_AGENT }}
+          EMBED_PROVIDER: local
         run: |
           python scripts/fetch_sources.py
           python -m clausecheck.ingest --rebuild
           python -m eval.run_eval --split tune --stage e2e --limit 10
-
-  deploy:
-    if: github.event_name == 'push'
-    needs: [lint, secrets, test, eval-smoke]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Push to the Hugging Face Space
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_SPACE: ${{ vars.HF_SPACE }}
-        run: |
-          git push --force "https://user:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE}" HEAD:main

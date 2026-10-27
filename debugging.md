@@ -20,7 +20,8 @@ cited answer, with uploads and amendments handled.
   `gemini-3.1-flash-lite` is the fallback; embeddings run locally (`EMBED_PROVIDER=local`,
   `all-MiniLM-L6-v2`), so they need no API quota.
 - **Deployment files:** `Dockerfile`, `.dockerignore`, `scripts/bootstrap.py`,
-  `scripts/usage_report.py`, CI jobs (`clean-clone-ingest`, `eval-smoke`, `deploy`).
+  `scripts/usage_report.py`, CI jobs (`clean-clone-ingest`, `eval-smoke`). The Hugging Face
+  `deploy` job was removed (2.36): Docker Spaces need a paid plan and nothing is deployed.
 - **Index:** 167 documents, 8,288 chunks, 8,288 vectors (158 corpus documents + uploads).
 
 ### How to run it
@@ -235,7 +236,7 @@ does not know without the pydantic plugin.
 - `Dockerfile`, `.dockerignore`, `scripts/bootstrap.py`, `scripts/usage_report.py`,
   `index_archive_url` setting, `tests/unit/test_bootstrap.py`, `test_usage_report.py`,
   `test_deploy_files.py`, `tests/e2e/test_live.py`, and the `clean-clone-ingest`, `eval-smoke`
-  and `deploy` jobs in `.github/workflows/ci.yml`.
+  and `deploy` jobs in `.github/workflows/ci.yml` (`deploy` removed again in 2.36).
 - Not done: `docs/evaluation/final-report.md`, `docs/qa.md`, and the held-out eval run. They need
   a working index and real API runs. The Docker image was not built.
 
@@ -515,6 +516,30 @@ does not know without the pydantic plugin.
   timeout); not changed.
 - Minor, not fixed: Groq's model sometimes writes citations as `[C1][C4]` with no space, and
   uses non-breaking hyphens (`SUR-HYD`); the app shows them as they are.
+
+### 2.36 CI: `deploy` job removed, `eval-smoke` checked locally: **Done**
+- Hugging Face Docker Spaces need a paid plan (the Create Space page marks Docker "Paid") and the
+  user decided not to deploy, so the `deploy` job (and `HF_TOKEN` / `HF_SPACE`) was removed from
+  `.github/workflows/ci.yml`. `tests/unit/test_deploy_files.py::test_ci_has_deploy_and_eval_smoke`
+  asserted that `deploy` and `HF_TOKEN` exist; it is now `test_ci_has_eval_smoke_and_no_deploy_job`.
+  `Dockerfile`, `.dockerignore` and `scripts/bootstrap.py` stay (they run anywhere with Docker).
+- `eval-smoke` (runs only on a push to `main`) was changed to install `sentence-transformers`, set
+  `EMBED_PROVIDER=local` and pass `EDGAR_USER_AGENT`, so it no longer spends the Gemini embedding
+  quota. It had never run, so its last two steps were run locally against a temporary index
+  (`INDEX_DIR` and `SQLITE_PATH` pointed at a scratch folder, real index untouched):
+  - `python -m clausecheck.ingest --rebuild` with local embeddings: 158 documents ingested,
+    8,062 chunks, 8,062 vectors, no failures.
+  - `python -m eval.run_eval --split tune --stage e2e --limit 10` with the real Groq and Gemini
+    keys: exit code 0, all 10 questions answered; answer correctness 0.8, citation accuracy 0.9,
+    false refusal rate 0.0, median latency 7.3 s.
+  - `refusal_accuracy` printed 0.0 only because the first 10 tune questions contain no
+    should-refuse question (0 of 0); it is not a failure.
+  - The result files the run created in `eval/results/` were deleted.
+- What "passes" means: the job only fails if a step crashes; it does not enforce any metric
+  threshold. Not verified: the GitHub runner itself (fresh `pip install` including PyTorch, the
+  corpus download in `fetch_sources.py`, run time), and the 7.3 s median is above the 3 s target
+  (this run also shared the machine with the test suite, and several questions include a cold
+  model load).
 
 ## 3. Verification
 
