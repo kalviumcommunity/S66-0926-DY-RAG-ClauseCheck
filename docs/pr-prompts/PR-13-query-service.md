@@ -1,83 +1,30 @@
-# PR 10 · Query service, follow-ups, cache, query log and the judge
+# PR 13 · Query service: end-to-end pipeline, streaming and tracing
 
-**Branch:** `b-query-service-followups` · **Owner:** Teammate (Generation, Application & Delivery) · **Week:** 4 · **Depends on:** PR 9
+**Branch:** `b-query-service` · **Owner:** Teammate (Generation, Application & Delivery) · **Week:** 4 · **Depends on:** PR 12
 
 ## Context
 
-This PR wires the whole query pipeline into one service the API will call:
+This PR wires the whole query pipeline into the one service the API will call:
 
 **rewrite follow-up → resolve supplier → hybrid retrieve + expand → re-rank → gate → build context → generate → validate**
 
-It adds conversation memory (the last few turns plus the last supplier), an answer cache, and a query log that records **everything needed to trace an answer**: chunk IDs, scores, prompt version, index version and threshold. It also adds an LLM judge from a different model family (Groq), with a 10% sample checked by hand.
+Every piece already exists (PR 9 to 12). This PR only orchestrates them, adds the blocking `answer()` and the streamed `stream()` paths, applies the "an answer with no valid citation becomes a refusal" rule, and makes sure every query (including errors and cache hits) is logged.
 
 Read before starting:
-- `docs/architecture/rag-architecture-design.md`: query pipeline step 1 and the traceability principle
-- `docs/architecture/tdd.md` §6–8 (query flow, caching, logging) and §16 (judge)
-- `docs/ux/user-flows.md`: the follow-up flow
-- `docs/ux/ui-states.md`: outcomes, and the unsupported-value warning
+- `docs/architecture/rag-architecture-design.md`: the full query pipeline and the traceability principle
+- `docs/architecture/tdd.md` §6–8 (query flow, caching, logging)
+- `docs/ux/ui-states.md`: outcomes, stream events and the unsupported-value warning
 
 ## Scope (only these files)
 
 | Path | Action |
 |---|---|
-| `clausecheck/prompts/rewrite.txt`, `clausecheck/prompts/judge.txt` | add |
-| `clausecheck/rag/rewriter.py` | add |
-| `clausecheck/services/sessions.py` | add |
 | `clausecheck/services/query_service.py` | add |
-| `clausecheck/store/cache.py` | add |
-| `clausecheck/store/query_log.py` | add |
-| `eval/judge.py` | add |
-| `eval/run_eval.py` | modify: `--stage e2e` |
-| `clausecheck/core/config.py`, `.env.example` | modify: `history_turns: int = 3`, `cache_ttl_seconds: int = 86400`, `judge_model: str = "llama-3.3-70b-versatile"` |
-| `tests/unit/test_rewriter.py`, `test_sessions.py`, `test_cache.py`, `test_query_log.py`, `test_judge.py`, `tests/integration/test_query_service.py` | add |
+| `tests/integration/test_query_service.py` | add |
+
+No config changes are needed: every setting used here was added in PR 9 to PR 12.
 
 ## Specification
-
-### Prompts
-
-- `rewrite.txt` (`# v1`, placeholders `{{history}}` and `{{question}}`): turn the latest question into **one stand-alone question** that names the supplier and the subject from the history. Output only the question.
-- `judge.txt` (`# v1`, placeholders `{{question}}`, `{{expected}}` and `{{answer}}`): reply with JSON only, `{"label": "correct" | "partial" | "wrong", "reason": "<one sentence>"}`. Grade by meaning. A missing citation doesn't change the label.
-
-### `clausecheck/services/sessions.py`
-
-```python
-@dataclass
-class Turn: question: str; answer: str
-@dataclass
-class Session: session_id: str; turns: list[Turn]; supplier_id: str | None
-
-class SessionStore:                       # in memory, thread-safe (threading.Lock)
-    def __init__(self, history_turns: int = 3): ...
-    def new(self) -> str: ...             # uuid4 hex
-    def get_or_create(self, session_id: str | None) -> Session: ...   # unknown id -> new session with that id
-    def append(self, session_id: str, question: str, answer: str, supplier_id: str | None) -> None: ...
-```
-
-`append` keeps only the last `history_turns` turns and updates `supplier_id` whenever it isn't `None`.
-
-### `clausecheck/rag/rewriter.py`
-
-`Rewriter(client, prompt)` with `rewrite(question: str, history: list[Turn]) -> str`:
-- **Empty history**: return `question` unchanged, with **no LLM call**.
-- Otherwise fill the prompt (history formatted as `User: …\nAssistant: …` lines) and call `client.complete(prompt, temperature=0.0)`.
-- Return the stripped result, or `question` if the result is empty.
-
-Also `@classmethod from_settings(cls, settings)`.
-
-### `clausecheck/store/cache.py`
-
-- `normalise(question) -> str`: lowercase, collapse whitespace, strip trailing `?`, `.` and `!`
-- `make_key(question, supplier_id, index_version, prompt_version) -> str`: sha256 of the normalised parts joined by `\x00`
-- `class AnswerCache`:
-  - `__init__(self, conn, ttl_seconds: int, clock: Callable[[], float] = time.time)` creates the table `answer_cache(key PK, value TEXT, created_at REAL)`
-  - `get(key) -> dict | None` returns `None` once expired
-  - `set(key, value: dict) -> None` stores the value as JSON
-
-### `clausecheck/store/query_log.py`
-
-`class QueryLog(conn)` creates `query_log` with columns `query_id PK, created_at, session_id, question, rewritten_question, supplier_id, outcome, refusal_reason, chunk_ids, scores, citations, unsupported, prompt_version, index_version, threshold, latency_ms, ttft_ms, cached, error`. JSON lists are stored as TEXT.
-- `log(record: dict) -> None`: missing keys become NULL; lists and dicts are JSON-encoded.
-- `recent(n: int = 20) -> list[dict]`: newest first, with JSON fields decoded.
 
 ### `clausecheck/services/query_service.py`
 
@@ -142,165 +89,7 @@ Flow (`answer`):
 - On an error, yield `error {"message": <generic>}` and then `done {"outcome": "error"}`.
 - **No-citation rule while streaming:** tokens are already sent, so `citations` comes with `unsupported=True`, and `done` carries `outcome="refused"`, `refusal_reason="no_citations"`. The UI uses that to replace the message (see `ui-states.md`).
 
-### `eval/judge.py`
-
-- `Grade(label: str, reason: str)`
-- `grade(client, prompt: Prompt, question, expected, answer) -> Grade`: parses the first `{…}` JSON object in the reply. A label outside `correct`, `partial` or `wrong`, or unparseable output, becomes `Grade("error", <short note>)`.
-- `sample_for_review(rows: list[dict], frac: float = 0.1, seed: int = 42) -> list[dict]`: returns `max(1, round(len * frac))` rows chosen with `random.Random(seed)`, or `[]` for empty input.
-- `agreement(judge: list[str], human: list[str]) -> float`: the share of equal labels.
-- `build_judge_client(settings)`: an `LLMClient` with **Groq** as primary (`judge_model`) and no fallback, so the judge is always a different family from the answering model.
-
-### `eval/run_eval.py` (`--stage e2e`)
-
-Runs every question in the split through `QueryService.from_settings`.
-- Grades: `exact` uses `contains_expected`, `real` uses the judge, and `unanswerable` is correct if `outcome == "refused"`.
-- Writes per-question rows, the metrics from PR 9, median latency, and `eval/results/{date}_judge_sample_{split}.csv` (the 10% sample with an empty `human_label` column for hand grading).
-- `--agreement path.csv` reads a hand-graded sample and prints the agreement.
-
 ## Tests
-
-### `tests/unit/test_sessions.py`
-
-```python
-from clausecheck.services.sessions import SessionStore
-
-
-def test_new_and_get_or_create():
-    store = SessionStore(history_turns=2)
-    sid = store.new()
-    assert store.get_or_create(sid).session_id == sid
-    assert store.get_or_create(None).session_id != sid
-    assert store.get_or_create("custom").session_id == "custom"
-
-
-def test_history_trimmed_and_supplier_kept():
-    store = SessionStore(history_turns=2)
-    sid = store.new()
-    store.append(sid, "q1", "a1", "S-ACME")
-    store.append(sid, "q2", "a2", None)
-    store.append(sid, "q3", "a3", None)
-    s = store.get_or_create(sid)
-    assert [t.question for t in s.turns] == ["q2", "q3"]
-    assert s.supplier_id == "S-ACME"
-```
-
-### `tests/unit/test_rewriter.py`
-
-```python
-from clausecheck.prompts.loader import Prompt
-from clausecheck.rag.rewriter import Rewriter
-from clausecheck.services.sessions import Turn
-
-PROMPT = Prompt("rewrite", "v1", "History:\n{{history}}\nQuestion: {{question}}")
-
-
-class FakeClient:
-    def __init__(self, reply="What is the notice period with Acme Corp?"):
-        self.reply = reply
-        self.calls = []
-
-    def complete(self, prompt, **kw):
-        self.calls.append(prompt)
-        return self.reply
-
-
-def test_no_history_no_call():
-    client = FakeClient()
-    assert Rewriter(client, PROMPT).rewrite("And their notice period?", []) == "And their notice period?"
-    assert client.calls == []
-
-
-def test_with_history_rewrites():
-    client = FakeClient()
-    history = [Turn("What are the payment terms with Acme Corp?", "Net 45 [C1].")]
-    out = Rewriter(client, PROMPT).rewrite("And their notice period?", history)
-    assert out == "What is the notice period with Acme Corp?"
-    assert "User: What are the payment terms with Acme Corp?" in client.calls[0]
-
-
-def test_empty_reply_falls_back():
-    out = Rewriter(FakeClient(reply="   "), PROMPT).rewrite("And the term?", [Turn("q", "a")])
-    assert out == "And the term?"
-```
-
-### `tests/unit/test_cache.py`
-
-```python
-from clausecheck.store import sqlite as db
-from clausecheck.store.cache import AnswerCache, make_key, normalise
-
-
-def test_normalise_and_key():
-    assert normalise("  What are the TERMS?  ") == "what are the terms"
-    k = make_key("Terms?", "S-ACME", "v1", "v1")
-    assert k == make_key("terms", "S-ACME", "v1", "v1")
-    assert k != make_key("terms", "S-ACME", "v2", "v1")
-    assert k != make_key("terms", "S-ACME", "v1", "v2")
-    assert k != make_key("terms", "S-BETA", "v1", "v1")
-
-
-def test_get_set_and_expiry(tmp_path):
-    conn = db.connect(tmp_path / "c.db")
-    now = [1000.0]
-    cache = AnswerCache(conn, ttl_seconds=60, clock=lambda: now[0])
-    assert cache.get("k") is None
-    cache.set("k", {"answer": "Net 45 [C1]."})
-    assert cache.get("k") == {"answer": "Net 45 [C1]."}
-    now[0] += 61
-    assert cache.get("k") is None
-```
-
-### `tests/unit/test_query_log.py`
-
-```python
-from clausecheck.store import sqlite as db
-from clausecheck.store.query_log import QueryLog
-
-
-def test_log_and_recent(tmp_path):
-    log = QueryLog(db.connect(tmp_path / "q.db"))
-    log.log({"query_id": "q1", "created_at": "2026-11-01T10:00:00", "question": "a", "outcome": "answered",
-             "chunk_ids": ["c1", "c2"], "scores": [0.9, 0.4], "cached": False})
-    log.log({"query_id": "q2", "created_at": "2026-11-01T10:01:00", "question": "b", "outcome": "refused"})
-    rows = log.recent(10)
-    assert [r["query_id"] for r in rows] == ["q2", "q1"]
-    assert rows[1]["chunk_ids"] == ["c1", "c2"] and rows[0]["chunk_ids"] is None
-```
-
-### `tests/unit/test_judge.py`
-
-```python
-from eval.judge import agreement, grade, sample_for_review
-from clausecheck.prompts.loader import Prompt
-
-PROMPT = Prompt("judge", "v1", "Q {{question}} E {{expected}} A {{answer}}")
-
-
-class Client:
-    def __init__(self, reply):
-        self.reply = reply
-
-    def complete(self, prompt, **kw):
-        return self.reply
-
-
-def test_parses_json_inside_text():
-    g = grade(Client('Sure: {"label": "correct", "reason": "same term"}'), PROMPT, "q", "Net 45", "Net 45 [C1].")
-    assert (g.label, g.reason) == ("correct", "same term")
-
-
-def test_bad_output_is_error():
-    assert grade(Client("no json"), PROMPT, "q", "e", "a").label == "error"
-    assert grade(Client('{"label": "great"}'), PROMPT, "q", "e", "a").label == "error"
-
-
-def test_sample_and_agreement():
-    rows = [{"qid": f"Q{i}"} for i in range(30)]
-    s1, s2 = sample_for_review(rows), sample_for_review(rows)
-    assert len(s1) == 3 and s1 == s2
-    assert sample_for_review([]) == []
-    assert agreement(["correct", "wrong"], ["correct", "partial"]) == 0.5
-```
 
 ### `tests/integration/test_query_service.py`
 
@@ -479,8 +268,14 @@ def test_stream_refusal_and_error(build):
    The follow-up should keep the same supplier.
 3. Ask the first question again. It should return `cached=True` with a much smaller `timings["total"]`.
 4. Run `sqlite3 index/clausecheck.db "SELECT outcome, prompt_version, index_version, threshold, latency_ms FROM query_log ORDER BY created_at DESC LIMIT 5;"`. Every column should be filled.
-5. Run `python -m eval.run_eval --split tune --stage e2e`. Grade the generated judge sample by hand in the CSV, then run `python -m eval.run_eval --agreement eval/results/<file>.csv`. Record correctness, citation accuracy, refusals, median latency and judge agreement in the PR description.
+5. Check streaming:
+   ```python
+   for e in svc.stream("What are the payment terms with <real supplier>?"):
+       print(e.type, e.data)
+   ```
+   Events should arrive in the order `meta`, `sources`, `token`…, `citations`, `done`.
+6. Break the LLM key on purpose (for example set a bad `GEMINI_API_KEY` and `GROQ_API_KEY` for one run). The result should be `outcome="error"` with a generic message, no key or provider text anywhere in it, and a second identical question must **not** come back as `cached`.
 
 ## Definition of done
 
-One service answers end to end with follow-ups, caching and full logging. The tuning split is measured end to end with spot-checked judge grades, and every test passes.
+One service answers end to end with follow-ups, caching, streaming and full logging, errors are generic and never cached, and every test passes.
