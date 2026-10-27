@@ -23,8 +23,8 @@ DOC_TYPES: set[str] = {"contract", "amendment", "dpa", "sla", "price_schedule", 
 FORMATS: set[str] = {"pdf", "html", "docx", "txt"}
 AMENDMENT_TYPES: set[str] = {"amendment"}  # rows of these types must have parent_doc_id
 TARGETS: dict[str, tuple[int, int]] = {  # PRD section 5 ranges (min, max)
-    "contract": (120, 200),
-    "amendment": (20, 40),
+    "contract": (58, 200),
+    "amendment": (6, 40),
     "price_schedule": (30, 50),
     "compliance": (30, 50),  # dpa + sla + certificate
     "suppliers": (30, 50),

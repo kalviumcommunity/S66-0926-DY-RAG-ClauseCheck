@@ -174,6 +174,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", type=Path, default=Path("eval/results"))
     parser.add_argument("--supplier-filter", choices=["on", "off"], default="on")
     parser.add_argument("--ablation", action="store_true", help="4 retrievers x filter on/off")
+    parser.add_argument("--sweep", metavar="RANGE", help="threshold sweep range start:stop:step")
     parser.add_argument("--allow-heldout", action="store_true")
     args = parser.parse_args(argv)
 
@@ -183,9 +184,13 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 2
-    if args.stage != "retrieval":
-        print(f"stage '{args.stage}' is available from PR 9/10", file=sys.stderr)
+    if args.stage == "e2e":
+        print("stage 'e2e' is available from PR 14", file=sys.stderr)
         return 3
+    if args.stage == "answer":
+        if args.sweep:
+            return _run_sweep(args)
+        return _run_answer(args)
     if args.ablation:
         return _run_ablation(args)
     if args.retriever not in RETRIEVERS:
@@ -208,3 +213,167 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+def _run_answer_for_threshold(settings, questions, retriever, reranker, generator, threshold):
+    from clausecheck.rag.citation_validator import validate
+    from clausecheck.rag.context_builder import build_context
+    from clausecheck.rag.generator import REFUSAL_TEXT
+    from clausecheck.rag.relevance_gate import check
+    from eval.metrics import (
+        answer_correctness,
+        citation_accuracy,
+        contains_expected,
+        false_refusal_rate,
+        refusal_accuracy,
+    )
+
+    records = []
+    refused_flags = []
+    should_refuse_flags = []
+    cited_ids = []
+    gold_ids = []
+    grades = []
+
+    for q in questions:
+        supplier = _supplier(q, True)
+        hits = retriever.retrieve(q.question, supplier, k=settings.rerank_candidates)
+        gate = check(hits, threshold, supplier_required=False, supplier_id=supplier)
+
+        if gate.passed:
+            ctx = build_context(hits, settings.context_token_budget)
+            answer = generator.generate(q.question, ctx.text)
+            vr = validate(answer, ctx.marker_map)
+            answer = vr.answer
+            citations = [c.chunk_id for c in vr.citations]
+            outcome = "refused" if answer.strip() == REFUSAL_TEXT else "answered"
+            unsupported = vr.unsupported
+        else:
+            answer = REFUSAL_TEXT
+            citations = []
+            outcome = "refused"
+            unsupported = False
+
+        refused = outcome == "refused"
+        refused_flags.append(refused)
+        should_refuse_flags.append(q.should_refuse)
+
+        if q.should_refuse:
+            grade = "correct" if refused else "wrong"
+        else:
+            if refused:
+                grade = "wrong"
+            else:
+                grade = "correct" if contains_expected(answer, q.expected_answer) else "wrong"
+
+        needs_judge = q.group == "real" and not q.should_refuse
+        records.append(
+            {
+                "qid": q.qid,
+                "group": q.group,
+                "question": q.question,
+                "outcome": outcome,
+                "answer": answer,
+                "citations": citations,
+                "unsupported": unsupported,
+                "grade": grade,
+                "needs_judge": needs_judge,
+            }
+        )
+        cited_ids.append(citations)
+        gold_ids.append(q.gold_chunk_ids)
+        grades.append(grade)
+
+    metrics = {
+        "answer_correctness": answer_correctness(grades) if grades else 0.0,
+        "citation_accuracy": (
+            citation_accuracy(cited_ids, gold_ids)
+            if any(c and g for c, g in zip(cited_ids, gold_ids, strict=False))
+            else 0.0
+        ),
+        "refusal_accuracy": refusal_accuracy(refused_flags, should_refuse_flags),
+        "false_refusal_rate": false_refusal_rate(refused_flags, should_refuse_flags),
+    }
+    return records, metrics
+
+
+def _run_answer(args) -> int:
+    from clausecheck.rag.generator import Generator
+    from clausecheck.rag.reranker import Reranker
+
+    settings, retriever = _hybrid_retriever()
+    reranker = Reranker(model_name=settings.rerank_model)
+    generator = Generator.from_settings(settings)
+    questions = load_questions(args.questions, split=args.split)
+
+    class _Wrapped:
+        def retrieve(self, q, supplier=None, k=None):
+            hits = retriever.retrieve(q, supplier, k=k or settings.rerank_candidates)
+            return reranker.rerank(q, hits, settings.rerank_top_n)
+
+    wrapped = _Wrapped()
+    records, metrics = _run_answer_for_threshold(
+        settings, questions, wrapped, reranker, generator, settings.relevance_threshold
+    )
+
+    result = {
+        "retriever": "hybrid_rerank",
+        "threshold": settings.relevance_threshold,
+        "metrics": metrics,
+        "per_question": records,
+    }
+    path = write_results(result, "answer", args.split, args.out)
+    print(json.dumps(metrics, indent=2))
+    print(f"-> {path}")
+
+
+def _run_sweep(args) -> int:
+    from clausecheck.rag.generator import Generator
+    from clausecheck.rag.reranker import Reranker
+
+    settings, retriever = _hybrid_retriever()
+    reranker = Reranker(model_name=settings.rerank_model)
+    generator = Generator.from_settings(settings)
+    questions = load_questions(args.questions, split=args.split)
+
+    class _Wrapped:
+        def retrieve(self, q, supplier=None, k=None):
+            hits = retriever.retrieve(q, supplier, k=k or settings.rerank_candidates)
+            return reranker.rerank(q, hits, settings.rerank_top_n)
+
+    wrapped = _Wrapped()
+
+    start, stop, step = (float(x) for x in args.sweep.split(":"))
+    thresholds = []
+    t = start
+    while t <= stop + 1e-9:
+        thresholds.append(round(t, 6))
+        t += step
+
+    import csv
+
+    out_dir = Path(args.out)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    sweep_path = out_dir / f"{dt.datetime.now(dt.UTC).date().isoformat()}_sweep_{args.split}.csv"
+    rows = []
+    for thr in thresholds:
+        _, metrics = _run_answer_for_threshold(
+            settings, questions, wrapped, reranker, generator, thr
+        )
+        row = {
+            "threshold": thr,
+            "refusal_accuracy": metrics["refusal_accuracy"],
+            "false_refusal_rate": metrics["false_refusal_rate"],
+            "answer_correctness": metrics["answer_correctness"],
+        }
+        rows.append(row)
+        print(row)
+
+    with sweep_path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        writer.writeheader()
+        writer.writerows(rows)
+    print(f"-> {sweep_path}")
+    return 0
+
+    return 0
