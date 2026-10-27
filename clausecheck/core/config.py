@@ -72,6 +72,11 @@ class Settings(BaseSettings):
     frontend_origin: str = "http://localhost:8501"
     port: int = 7860
 
+    # Uploads (PR 16)
+    max_upload_mb: int = 20
+    allowed_types: str = "pdf,html,htm,docx,txt"
+    uploads_dir: Path = Path("data/uploads")
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

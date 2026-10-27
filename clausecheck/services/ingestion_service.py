@@ -164,4 +164,178 @@ def run_manifest(
                 vector_store=vector_store,
             )
         )
+
     return results
+
+
+class DuplicateDocumentError(Exception):
+    def __init__(self, doc_id: str):
+        super().__init__(doc_id)
+        self.doc_id = doc_id
+
+
+class UploadService:
+    def __init__(
+        self,
+        conn_factory,
+        settings,
+        *,
+        embedder=None,
+        vector_store=None,
+        on_indexed=None,
+        executor=None,
+    ):
+        from concurrent.futures import ThreadPoolExecutor
+
+        self.conn_factory = conn_factory
+        self.settings = settings
+        self.embedder = embedder
+        self.vector_store = vector_store
+        self.on_indexed = on_indexed
+        self.executor = executor or ThreadPoolExecutor(max_workers=1)
+
+    def _sha256(self, content: bytes) -> str:
+        import hashlib
+
+        return hashlib.sha256(content).hexdigest()
+
+    def _safe_name(self, filename: str) -> str:
+        return "".join(c if c.isalnum() or c in "._-" else "_" for c in filename)
+
+    def submit(
+        self, filename: str, content: bytes, supplier_id: str, doc_type: str = "contract"
+    ) -> str:
+        sha = self._sha256(content)
+        # duplicate check
+        conn = self.conn_factory()
+        try:
+            row = conn.execute("SELECT doc_id FROM documents WHERE sha256=?", (sha,)).fetchone()
+        finally:
+            conn.close()
+        if row is not None:
+            raise DuplicateDocumentError(row["doc_id"] if hasattr(row, "keys") else row[0])
+
+        uploads_dir = self.settings.uploads_dir
+        if not isinstance(uploads_dir, __import__("pathlib").Path):
+            uploads_dir = __import__("pathlib").Path(uploads_dir)
+        uploads_dir.mkdir(parents=True, exist_ok=True)
+        dest = uploads_dir / f"{sha[:12]}_{self._safe_name(filename)}"
+
+        import uuid
+
+        job_id = uuid.uuid4().hex
+        conn = self.conn_factory()
+        try:
+            conn.execute(
+                "INSERT INTO jobs (job_id, kind, status, filename, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (job_id, "upload", "queued", filename, _now(), _now()),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        dest.write_bytes(content)
+
+        self.executor.submit(self._run, job_id, filename, content, supplier_id, doc_type, sha, dest)
+        return job_id
+
+    def _run(self, job_id, filename, content, supplier_id, doc_type, sha, dest):
+        from pathlib import Path
+
+        from clausecheck.core import ids
+
+        conn = self.conn_factory()
+        try:
+            conn.execute(
+                "UPDATE jobs SET status=?, updated_at=? WHERE job_id=?",
+                ("running", _now(), job_id),
+            )
+            conn.commit()
+
+            ext = Path(filename).suffix.lstrip(".").lower()
+            if ext == "htm":
+                ext = "html"
+            if ext not in {"pdf", "html", "docx", "txt"}:
+                ext = "txt"
+
+            row = {
+                "doc_id": ids.doc_id("upload", sha),
+                "supplier_id": supplier_id,
+                "source": "upload",
+                "doc_type": doc_type,
+                "format": ext,
+                "path": str(dest),
+                "title": filename,
+                "effective_date": "",
+                "parent_doc_id": "",
+                "licence": "user upload",
+                "url": "",
+                "sha256": sha,
+                "is_synthetic": "false",
+            }
+
+            # upsert supplier if unknown
+            try:
+                db.upsert_supplier(conn, supplier_id, supplier_id, [])
+            except Exception:
+                pass
+
+            from clausecheck.services.ingestion_service import ingest_document
+
+            settings = self.settings
+            result = ingest_document(
+                conn,
+                row,
+                root=Path("."),
+                settings=settings,
+                embedder=self.embedder,
+                vector_store=self.vector_store,
+            )
+            if result.status == "failed":
+                raise RuntimeError(result.error or "ingest failed")
+
+            conn.execute(
+                "UPDATE jobs SET status=?, doc_id=?, updated_at=? WHERE job_id=?",
+                ("done", result.doc_id, _now(), job_id),
+            )
+            conn.commit()
+            if self.on_indexed is not None:
+                try:
+                    self.on_indexed()
+                except Exception:
+                    pass
+        except Exception as exc:
+            try:
+                conn.execute(
+                    "UPDATE jobs SET status=?, error=?, updated_at=? WHERE job_id=?",
+                    ("failed", f"{type(exc).__name__}: {exc}", _now(), job_id),
+                )
+                conn.commit()
+            except Exception:
+                pass
+        finally:
+            conn.close()
+
+    def get_job(self, job_id: str):
+        conn = self.conn_factory()
+        try:
+            row = conn.execute(
+                "SELECT job_id, status, doc_id, error FROM jobs WHERE job_id=?", (job_id,)
+            ).fetchone()
+            if row is None:
+                return None
+            return {
+                "job_id": row["job_id"],
+                "status": row["status"],
+                "doc_id": row["doc_id"],
+                "error": row["error"],
+            }
+        finally:
+            conn.close()
+
+
+def _now() -> str:
+    import datetime
+
+    return datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")

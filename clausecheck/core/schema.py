@@ -18,7 +18,7 @@ MANIFEST_COLUMNS: list[str] = [
     "is_synthetic",
 ]
 SUPPLIER_COLUMNS: list[str] = ["supplier_id", "display_name", "aliases"]  # aliases joined by "|"
-SOURCES: set[str] = {"cuad", "edgar", "vendor", "synthetic"}
+SOURCES: set[str] = {"cuad", "edgar", "vendor", "synthetic", "upload"}
 DOC_TYPES: set[str] = {"contract", "amendment", "dpa", "sla", "price_schedule", "certificate"}
 FORMATS: set[str] = {"pdf", "html", "docx", "txt"}
 AMENDMENT_TYPES: set[str] = {"amendment"}  # rows of these types must have parent_doc_id
