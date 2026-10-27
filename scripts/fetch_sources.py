@@ -648,20 +648,51 @@ def amendment_number(title: str) -> int:
     return 1
 
 
-def amendment_effective_date(text: str) -> str | None:
-    """Calendar effective date from the text, else the signature date, else None (DV-9)."""
-    m = re.search(r"effective\s+(?:as\s+of\s+|on\s+)?", text[:8000], re.I)
-    if m:
-        found = parse_date(text[m.end() : m.end() + 40])
-        if found:
+def amendment_effective_date(text: str, exclude: str | None = None) -> str | None:
+    """An amendment's own date: 'effective <date>', else a date before the recital, else the
+    signature date; never `exclude` (the date of the agreement being amended) (DV-9)."""
+    for m in re.finditer(r"effective\s+(?:as\s+of\s+|on\s+)?", text[:4000], re.I):
+        found = parse_date(text[m.end() : m.end() + 30])
+        if found and found != exclude and re.match(r"[A-Za-z0-9]", text[m.end() : m.end() + 1]):
             return found
-    return parse_date(text[-2500:])
+    recital = RECITAL.search(text[:6000])
+    head = text[: recital.start()] if recital else text[:600]
+    for candidate in (parse_date(head), parse_date(text[-2500:])):
+        if candidate and candidate != exclude:
+            return candidate
+    return None
 
 
-def _edgar_hits(fetcher: Fetcher, headers: dict, query: str, limit: int) -> list[dict]:
-    resp = fetcher.get(
-        "edgar", EDGAR_SEARCH, headers, params={"q": query, "forms": "8-K,10-K,10-Q"}
-    )
+EDGAR_MAX_PAIRS = 40
+RECITAL = re.compile(
+    r"(?i:amends?|amendment\s+to|modification\s+of|modifies)\s+"
+    r"(?:(?i:that\s+certain|the|certain)\s+)?"
+    r"(?P<title>[A-Z][^.;:]{3,100}?(?:Agreement|Contract))(?P<tail>[^.]{0,140})"
+)
+
+
+def original_reference(text: str) -> tuple[str, str] | None:
+    """Return (title, ISO date) of the agreement an amendment amends, from its recitals."""
+    for m in RECITAL.finditer(text[:6000]):
+        date = parse_date(m.group("tail"))
+        if date:
+            return " ".join(m.group("title").split()), date
+    return None
+
+
+def dates_in(text: str) -> set[str]:
+    """Every calendar date that appears in `text`, as ISO strings."""
+    found = set()
+    for pattern in DATE_PATTERNS:
+        for m in pattern.finditer(text):
+            if iso := parse_date(m.group(0)):
+                found.add(iso)
+    return found
+
+
+def _edgar_hits(fetcher: Fetcher, headers: dict, params: dict, limit: int = 100) -> list[dict]:
+    """Search EDGAR full text and return the EX-10 exhibits among the hits."""
+    resp = fetcher.get("edgar", EDGAR_SEARCH, headers, params=params)
     if resp is None or resp.status_code != 200:
         return []
     hits = []
@@ -671,9 +702,12 @@ def _edgar_hits(fetcher: Fetcher, headers: dict, query: str, limit: int) -> list
             continue
         accession, _, filename = hit["_id"].partition(":")
         cik = int(src["ciks"][0])
+        name = re.sub(r"\s*\(.*$", "", src.get("display_names", [""])[0]).strip()
         hits.append(
             {
-                "company": re.sub(r"\s*\(CIK.*$", "", src.get("display_names", [""])[0]),
+                "company": name,
+                "cik": src["ciks"][0],
+                "file_date": src.get("file_date", ""),
                 "url": (
                     f"https://www.sec.gov/Archives/edgar/data/{cik}/"
                     f"{accession.replace('-', '')}/{filename}"
@@ -687,58 +721,115 @@ def _edgar_hits(fetcher: Fetcher, headers: dict, query: str, limit: int) -> list
     return hits
 
 
+def _download_exhibit(fetcher, headers, hit, out) -> tuple[Path, str] | None:
+    dest = out / f"{hit['accession']}_{_safe(hit['filename'])}"
+    if needs_download(dest):
+        resp = fetcher.get("edgar", hit["url"], headers, dest=dest)
+        if resp is None or resp.status_code != 200:
+            dest.unlink(missing_ok=True)
+            return None
+    return dest, html_text(dest.read_bytes())[1]
+
+
+def _entry(hit, dest, kind, title, date, parent_id, supplier, aliases) -> dict:
+    return {
+        "source": "edgar",
+        "doc_type": kind,
+        "format": "html" if dest.suffix.lower() in {".htm", ".html"} else "txt",
+        "path": dest.relative_to(ROOT).as_posix(),
+        "title": title,
+        "effective_date": date,
+        "parent_doc_id": parent_id,
+        "licence": "public SEC filing",
+        "url": hit["url"],
+        "supplier_name": supplier,
+        "aliases": aliases,
+    }
+
+
+def _find_original(fetcher, headers, amendment, ref, out):
+    """Search the same company's filings for the agreement the amendment amends."""
+    title, date = ref
+    for hit in _edgar_hits(fetcher, headers, {"q": f'"{title}"', "ciks": amendment["cik"]}):
+        if hit["url"] == amendment["url"] or hit["file_date"] > amendment["file_date"]:
+            continue
+        got = _download_exhibit(fetcher, headers, hit, out)
+        if got is None:
+            continue
+        dest, text = got
+        if re.search(r"amendment|modification", text[:300], re.I):
+            continue  # that is another amendment, not the original
+        top = text[:400].lower()
+        if "dear " in text[:600].lower() or " ".join(title.lower().split()) not in top:
+            continue  # a letter, or not the agreement with this title
+        if date in dates_in(text[:8000]):
+            return hit, dest
+    return None
+
+
 def fetch_edgar(
     fetcher: Fetcher, raw_dir: Path, user_agent: str, cuad: list[dict], limit: int | None
 ) -> list[dict]:
-    """Find amendments whose original is in the CUAD selection, download both, return entries.
+    """Find EX-10 amendments, pair each with its original, and return entries for both.
 
-    Only pairs whose original is already in the corpus are kept (data-sourcing.md 5.4).
+    The original is the CUAD contract of the same company if there is one, otherwise the
+    agreement found in the same company's earlier EDGAR filings. An amendment whose original is
+    not found, or that has no effective date, is dropped (data-sourcing.md 5.4).
     """
     headers = edgar_headers(user_agent)
     out = raw_dir / "edgar"
     index_path = out / "_index.json"
     index = json.loads(index_path.read_text()) if index_path.exists() else {}
-    originals = {schema.normalise_name(e["supplier_name"]): e for e in cuad}
+    cuad_by_name = {schema.normalise_name(e["supplier_name"]): e for e in cuad}
     seen = {e["url"] for e in index.values()}
+    pairs = sum(e["doc_type"] == "amendment" for e in index.values())
     for query in EDGAR_QUERIES:
-        for hit in _edgar_hits(fetcher, headers, query, limit or 100):
+        params = {"q": query, "forms": "8-K,10-K,10-Q"}
+        for hit in _edgar_hits(fetcher, headers, params, limit or 100):
+            if pairs >= EDGAR_MAX_PAIRS:
+                break
             if hit["url"] in seen:
                 continue
-            parent = originals.get(schema.normalise_name(hit["company"]))
-            if parent is None:
+            got = _download_exhibit(fetcher, headers, hit, out)
+            if got is None:
                 continue
-            dest = out / f"{hit['accession']}_{_safe(hit['filename'])}"
-            resp = fetcher.get("edgar", hit["url"], headers, dest=dest)
-            if resp is None or resp.status_code != 200:
+            dest, text = got
+            ref = original_reference(text)
+            date = amendment_effective_date(text, ref[1] if ref else None)
+            if not re.search(r"amendment|modification", text[:400], re.I) or not (ref and date):
+                dest.unlink(missing_ok=True)
                 continue
-            title, text = html_text(dest.read_bytes())
-            if not re.search(r"amendment|modification", (title + " " + text[:400]), re.I):
-                dest.unlink()
-                continue
-            date = amendment_effective_date(text)
-            if date is None:
-                dest.unlink()
-                continue
-            heading = text[:200].strip() or title
-            parent_id = doc_id("cuad", parent["title"])
-            index[hit["accession"]] = {
-                "source": "edgar",
-                "doc_type": "amendment",
-                "format": "html" if dest.suffix.lower() in {".htm", ".html"} else "txt",
-                "path": dest.relative_to(ROOT).as_posix(),
-                "title": f"{hit['company']} amendment {amendment_number(heading)}: {heading[:80]}",
-                "effective_date": date,
-                "parent_doc_id": parent_id,
-                "licence": "public SEC filing",
-                "url": hit["url"],
-                "supplier_name": parent["supplier_name"],
-                "aliases": sorted({hit["company"]} - {parent["supplier_name"]}),
-            }
+            company = hit["company"]
+            cuad_parent = cuad_by_name.get(schema.normalise_name(company))
+            if cuad_parent is not None:
+                parent_id, supplier = (
+                    doc_id("cuad", cuad_parent["title"]),
+                    cuad_parent["supplier_name"],
+                )
+            else:
+                found = _find_original(fetcher, headers, hit, ref, out)
+                if found is None:
+                    dest.unlink(missing_ok=True)
+                    continue
+                orig_hit, orig_dest = found
+                supplier = company
+                orig_title = f"{company} {ref[0]} ({ref[1]})"
+                parent_id = doc_id("edgar", orig_title)
+                index[orig_hit["accession"] + ":" + orig_hit["filename"]] = _entry(
+                    orig_hit, orig_dest, "contract", orig_title, ref[1], "", supplier, []
+                )
+                seen.add(orig_hit["url"])
+            heading = text[:120].strip()
+            title = f"{company} amendment {amendment_number(heading)} to {ref[0]} ({date})"
+            index[hit["accession"] + ":" + hit["filename"]] = _entry(
+                hit, dest, "amendment", title, date, parent_id, supplier, []
+            )
             seen.add(hit["url"])
+            pairs += 1
     out.mkdir(parents=True, exist_ok=True)
     index_path.write_text(json.dumps(index, indent=1, sort_keys=True))
     entries = [e for e in index.values() if (ROOT / e["path"]).exists()]
-    print(f"edgar: {len(entries)} amendments")
+    print(f"edgar: {pairs} amendments, {len(entries) - pairs} originals found on EDGAR")
     return entries
 
 
@@ -859,7 +950,7 @@ def main(argv: list[str] | None = None) -> int:
                 for e in json.loads(index_path.read_text()).values()
                 if (ROOT / e["path"]).exists()
             ]
-    if "cuad" not in want:
+    if "cuad" not in want and "edgar" not in want:
         entries += fetch_cuad(fetcher, raw_dir, None)
 
     total, suppliers = rebuild_manifest(entries)
