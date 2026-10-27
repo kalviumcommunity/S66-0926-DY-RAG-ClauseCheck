@@ -68,6 +68,10 @@ class Settings(BaseSettings):
     index_dir: Path = Path("index")
     sqlite_path: Path = Path("index/clausecheck.db")
 
+    # API (PR 15)
+    frontend_origin: str = "http://localhost:8501"
+    port: int = 7860
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
