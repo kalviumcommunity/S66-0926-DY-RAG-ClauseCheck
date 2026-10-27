@@ -17,7 +17,7 @@ def list_documents(
     limit = min(max(limit, 1), 200)
     conn = container.conn
     sql = "SELECT * FROM documents WHERE 1=1"
-    args = []
+    args: list[str | int] = []
     if supplier_id:
         sql += " AND supplier_id=?"
         args.append(supplier_id)
@@ -45,6 +45,10 @@ async def upload_document(
     container=Depends(get_container),
 ):
     settings = container.settings
+    supplier_id = supplier_id.strip()
+    if not supplier_id:
+        # without a supplier the document cannot be searched on its own and is easily outranked
+        return JSONResponse(status_code=422, content={"detail": "supplier_id is required"})
     content = await file.read()
     max_bytes = settings.max_upload_mb * 1024 * 1024
     if len(content) > max_bytes:

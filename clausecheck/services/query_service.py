@@ -189,7 +189,9 @@ class QueryService:
 
         t_rerank = time.perf_counter()
         try:
-            hits = self.reranker.rerank(rewritten, hits, self.top_n)
+            hits = self.reranker.rerank(
+                self.supplier_detector.strip_names(rewritten, supplier), hits, self.top_n
+            )
         except Exception:
             pass
         rerank_ms = (time.perf_counter() - t_rerank) * 1000
@@ -351,7 +353,9 @@ class QueryService:
         retrieve_ms = (time.perf_counter() - t_ret) * 1000
         t_rerank = time.perf_counter()
         try:
-            hits = self.reranker.rerank(rewritten, hits, self.top_n)
+            hits = self.reranker.rerank(
+                self.supplier_detector.strip_names(rewritten, supplier), hits, self.top_n
+            )
         except Exception:
             pass
         rerank_ms = (time.perf_counter() - t_rerank) * 1000

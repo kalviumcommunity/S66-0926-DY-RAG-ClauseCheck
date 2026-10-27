@@ -21,15 +21,14 @@ def health(container=Depends(get_container)):
     except Exception:
         checks["sqlite"] = False
     try:
-        if container.vector_count is not None:
-            container.vector_count()
+        # chunks without vectors means the index was never embedded: vector search is empty
+        if container.vector_count is not None and container.vector_count() == 0 and chunks > 0:
+            checks["vector_store"] = False
     except Exception:
         checks["vector_store"] = False
     try:
-        if (
-            not settings.gemini_api_key.get_secret_value()
-            or not settings.groq_api_key.get_secret_value()
-        ):
+        # Groq is only the fallback, so Gemini alone counts as configured
+        if not settings.gemini_api_key.get_secret_value():
             checks["llm_configured"] = False
     except Exception:
         checks["llm_configured"] = False

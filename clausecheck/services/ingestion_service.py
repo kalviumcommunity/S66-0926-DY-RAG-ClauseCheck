@@ -275,9 +275,24 @@ class UploadService:
                 "is_synthetic": "false",
             }
 
-            # upsert supplier if unknown
+            # Create the supplier if it is new. An existing supplier keeps its display name and
+            # aliases: upsert_supplier would replace both.
             try:
-                db.upsert_supplier(conn, supplier_id, supplier_id, [])
+                if not conn.execute(
+                    "SELECT 1 FROM suppliers WHERE supplier_id=?", (supplier_id,)
+                ).fetchone():
+                    name = " ".join(supplier_id.replace("-", " ").replace("_", " ").split())
+                    db.upsert_supplier(conn, supplier_id, name.title(), [supplier_id])
+            except Exception:
+                pass
+
+            # An amendment must be linked to its agreement, or its clauses are just more
+            # contract text. Failures here are left for ingest_document to report.
+            try:
+                from clausecheck.services import amendments
+
+                head = "\n".join(p.text for p in clean(load(Path(dest), row)).pages[:2])
+                row = amendments.describe(conn, row, head)
             except Exception:
                 pass
 

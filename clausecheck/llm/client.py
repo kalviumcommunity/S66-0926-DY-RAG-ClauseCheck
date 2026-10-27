@@ -18,6 +18,23 @@ class ProviderError(Exception):
     """Raised by a provider adapter when a call fails."""
 
 
+def describe_error(exc: Exception) -> str:
+    """The exception type and HTTP status code, such as `RateLimitError 429`.
+
+    Never the message: provider messages can echo request data, including keys.
+    """
+    code = getattr(exc, "status_code", None) or getattr(exc, "code", None)
+    name = type(exc).__name__
+    return f"{name} {code}" if isinstance(code, int) else name
+
+
+def provider_error(provider: str, exc: Exception) -> ProviderError:
+    """A `ProviderError` for an adapter to raise; logs why, using only `describe_error`."""
+    reason = describe_error(exc)
+    logger.warning("%s call failed: %s", provider, reason)
+    return ProviderError(reason)
+
+
 class LLMError(Exception):
     """Raised by the client when every provider has failed. Never carries provider text."""
 
@@ -57,17 +74,28 @@ class LLMClient:
 
     @classmethod
     def from_settings(cls, settings: "Settings") -> "LLMClient":
-        """Build a client with Gemini as primary and Groq as fallback."""
+        """Build a client from `LLM_PRIMARY`; the other provider is the fallback.
+
+        Groq is optional: without its key, Gemini is the primary and failures are final.
+        """
         from clausecheck.llm.gemini import GeminiProvider
         from clausecheck.llm.groq import GroqProvider
 
+        gemini = GeminiProvider(
+            settings.gemini_api_key, settings.gemini_model, settings.llm_timeout_seconds
+        )
+        groq = (
+            GroqProvider(settings.groq_api_key, settings.groq_model, settings.llm_timeout_seconds)
+            if settings.groq_api_key.get_secret_value()
+            else None
+        )
+        if settings.llm_primary == "groq" and groq is not None:
+            primary, fallback = groq, gemini
+        else:
+            primary, fallback = gemini, groq
         return cls(
-            primary=GeminiProvider(
-                settings.gemini_api_key, settings.gemini_model, settings.llm_timeout_seconds
-            ),
-            fallback=GroqProvider(
-                settings.groq_api_key, settings.groq_model, settings.llm_timeout_seconds
-            ),
+            primary=primary,
+            fallback=fallback,
             max_retries=settings.llm_max_retries,
             wait_seconds=settings.llm_retry_wait_seconds,
         )

@@ -12,6 +12,12 @@ from clausecheck.rag.generator import REFUSAL_TEXT
 REFUSAL_COPY = REFUSAL_TEXT
 
 
+def escape_dollars(text: str) -> str:
+    """Streamlit's markdown renders text between two `$` as a formula, so prices come out garbled
+    ("$44.10 ... $42.75" becomes one code-like span). A backslash makes each `$` literal."""
+    return text.replace("$", "\\$")
+
+
 class StreamCollector:
     def __init__(self, events):
         self._events = list(events)
@@ -36,7 +42,7 @@ class StreamCollector:
             elif typ == "token":
                 text = data.get("text", "")
                 self._tokens.append(text)
-                yield text
+                yield escape_dollars(text)
             elif typ == "citations":
                 self._citations = data.get("citations", [])
                 self._unsupported = data.get("unsupported", False)
@@ -69,11 +75,11 @@ class StreamCollector:
 def render_message(msg, api):
     outcome = msg.get("outcome")
     if outcome == "refused":
-        st.info(msg.get("content", ""))
+        st.info(escape_dollars(msg.get("content", "")))
     elif outcome == "error":
         st.error(msg.get("error") or "Something went wrong.")
     else:
-        st.markdown(msg.get("content", ""))
+        st.markdown(escape_dollars(msg.get("content", "")))
     if msg.get("unsupported"):
         st.warning(
             "A number in this answer wasn't found in the cited clause. Check it before acting."

@@ -85,11 +85,46 @@ def clean_text(text: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
+def _running_key(line: str) -> str:
+    """The line lowercased; digits are masked only on page-number lines ("Page 2 of 4").
+
+    Masking every line would make "5.1 Payment" and "6.1 Payment" look like one repeated line.
+    """
+    key = line.strip().lower()
+    return re.sub(r"\d+", "#", key) if re.search(r"\bpage\b", key) else key
+
+
+def strip_running_lines(texts: list[str]) -> list[str]:
+    """Drop page headers and footers: lines that repeat on at least half of the pages.
+
+    A single-page document is left alone, and a line must be on at least two pages, so one
+    clause is never mistaken for a footer.
+    """
+    n = len(texts)
+    if n < 2:
+        return texts
+    needed = max(2, (n + 1) // 2)
+    pages_with: dict[str, int] = {}
+    for text in texts:
+        for key in {_running_key(line) for line in text.split("\n") if line.strip()}:
+            pages_with[key] = pages_with.get(key, 0) + 1
+    repeated = {k for k, count in pages_with.items() if count >= needed and len(k) <= 200}
+    return [
+        "\n".join(
+            line
+            for line in text.split("\n")
+            if _running_key(line) not in repeated or not line.strip()
+        )
+        for text in texts
+    ]
+
+
 def clean(raw: RawDocument) -> CleanDocument:
     """Clean every page, flag redactions per page and for the document, strip table cells."""
     pages = []
-    for page in raw.pages:
-        text = clean_text(page.text)
+    texts = strip_running_lines([page.text for page in raw.pages])
+    for page, page_text in zip(raw.pages, texts, strict=True):
+        text = clean_text(page_text)
         pages.append(CleanPage(number=page.number, text=text, has_redaction=detect_redaction(text)))
     tables = [
         Table(

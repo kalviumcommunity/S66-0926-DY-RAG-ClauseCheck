@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
 from clausecheck.api.deps import get_container
-from clausecheck.api.schemas import ChatRequest, ChatResponse
+from clausecheck.api.schemas import ChatRequest, ChatResponse, CitationOut
 
 router = APIRouter()
 
@@ -15,14 +15,14 @@ def chat(req: ChatRequest, container=Depends(get_container)):
         req.question, session_id=req.session_id, supplier_filter=req.supplier_id
     )
     citations = [
-        {
-            "marker": c.marker,
-            "chunk_id": c.chunk_id,
-            "doc_id": c.doc_id,
-            "page": c.page,
-            "section": c.section,
-            "clause_no": c.clause_no,
-        }
+        CitationOut(
+            marker=c.marker,
+            chunk_id=c.chunk_id,
+            doc_id=c.doc_id,
+            page=c.page,
+            section=c.section,
+            clause_no=c.clause_no,
+        )
         for c in r.citations
     ]
     return ChatResponse(

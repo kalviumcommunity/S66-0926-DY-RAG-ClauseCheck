@@ -1,0 +1,10 @@
+.env
+.git
+.venv
+index/
+data/raw/
+data/uploads/
+tests/
+notebooks/
+frontend/
+**/__pycache__

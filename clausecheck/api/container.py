@@ -22,6 +22,7 @@ class AppContainer:
         conn = db.connect(settings.sqlite_path)
         db.init_db(conn)
 
+        from clausecheck.rag.supplier_detector import SupplierDetector
         from clausecheck.services.ingestion_service import UploadService
         from clausecheck.services.query_service import QueryService
         from clausecheck.store.bm25_index import BM25Index
@@ -36,12 +37,17 @@ class AppContainer:
         def on_indexed():
             if retriever is not None and getattr(retriever, "conn", None) is not None:
                 retriever.bm25 = BM25Index.from_conn(retriever.conn)
+            # an uploaded document may belong to a supplier the detector has not seen
+            query_service.supplier_detector = SupplierDetector.from_conn(
+                conn, settings.supplier_match_min
+            )
 
         embedder = None
         vector_store = None
-        if retriever is not None and getattr(retriever, "vector", None) is not None:
-            embedder = retriever.vector.embedder
-            vector_store = retriever.vector.store
+        vector = getattr(retriever, "vector_retriever", None)
+        if vector is not None:
+            embedder = vector.embedder
+            vector_store = vector.store
 
         upload_service = UploadService(
             lambda: db.connect(settings.sqlite_path),
@@ -52,10 +58,9 @@ class AppContainer:
         )
 
         def vector_count() -> int:
-            try:
-                return conn.execute("SELECT COUNT(*) FROM chunks").fetchone()[0]
-            except Exception:
+            if vector_store is None:
                 return 0
+            return vector_store.count()
 
         return cls(
             settings=settings,

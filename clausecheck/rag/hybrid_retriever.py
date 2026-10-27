@@ -39,8 +39,8 @@ def _expansion_hit(chunk) -> SearchHit:
 def expand_amendments(hits: list[SearchHit], conn: sqlite3.Connection) -> list[SearchHit]:
     """Return `hits` followed by the amended or amending clauses they are linked to.
 
-    A hit in an amendment pulls in the parent's clauses it references (or that share its clause
-    number). A hit in an original pulls in the child clauses that reference its clause number.
+    A hit in an amendment pulls in the parent's clauses it references by number ("Section 6.1").
+    A hit in an original pulls in the child clauses that reference its clause number.
     Chains are followed up to 3 levels.
     """
     out = list(hits)
@@ -61,9 +61,9 @@ def expand_amendments(hits: list[SearchHit], conn: sqlite3.Connection) -> list[S
             doc = db.get_document(conn, doc_id)
             found = []
             if doc and doc.get("parent_doc_id"):
+                # Only clauses the amendment names. An amendment numbers its own clauses (its
+                # 4.2 is "Counterparts"), so sharing a number with the parent means nothing.
                 refs = set(CLAUSE_REF_RE.findall(text))
-                if clause_no:
-                    refs.add(clause_no)
                 found += [
                     c
                     for c in db.get_chunks(conn, doc_id=doc["parent_doc_id"])
