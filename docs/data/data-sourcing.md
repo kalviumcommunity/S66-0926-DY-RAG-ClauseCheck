@@ -447,3 +447,53 @@ All of the above is public or synthetic data. Nothing confidential enters the co
 - **Vendor pages change.** Hashes and archive snapshots let us detect and recover versions, but a vendor document can still disappear.
 - **CUAD labels were made for legal review, not procurement.** Labels usually cover the whole clause (median about 300 characters), longer than a buyer's answer needs, so the LLM judge compares meaning, not exact text.
 - **Thin categories.** Most Favored Nation and Price Restrictions have fewer than a dozen labelled procurement contracts each.
+
+---
+
+## 14. Corpus as built (PR 3)
+
+Built with `python scripts/fetch_sources.py` and `python scripts/generate_synthetic.py --seed 42`. Counts are from `data/manifest.csv`. Differences from sections 1 to 13 are listed after the tables.
+
+| Source | `doc_type` | Format | Documents | Target (PRD 5) | Status |
+|---|---|---|---|---|---|
+| CUAD | contract | pdf | 47 | 120 to 200 contracts (all sources) | **Shortfall** |
+| CUAD | contract | txt | 11 | | |
+| EDGAR | amendment | html | 0 | 20 to 40 | **Shortfall** |
+| Vendor | dpa | html | 5 | 30 to 50 compliance documents (dpa, sla, certificate) | Met (48) |
+| Vendor | sla | html | 13 | | |
+| Synthetic | price_schedule | docx | 40 | 30 to 50 | Met |
+| Synthetic | certificate | txt | 30 | counted under compliance | |
+| All | | | **146** | | |
+
+Suppliers: **63** (target 30 to 50). Synthetic documents are attached to 40 of them, chosen with seed 42. The synthetic price schedules and certificates are regenerated with the seed, so their raw files are not committed.
+
+### 14.1 Shortfalls and their reasons
+
+**Contracts: 58 of 120.** Funnel for CUAD (counts from `scripts/fetch_sources.py`):
+
+| Step | Contracts left |
+|---|---|
+| Procurement type, by PDF folder or title (4.3, step 1) | 177 |
+| Title matches one of the two file-name patterns, and is not an amendment (step 3) | 157 |
+| Labels in at least 3 procurement categories (step 2) | 121 |
+| Supplier role identifiable (section 8, rule 1) | 67 |
+| Effective date found: Effective Date label, Agreement Date label, then the first 3,000 characters of text (DV-8) | **58** |
+
+The 121 before the supplier step is close to the 137 in the validation report; the report counted by title only and did not apply the amendment exclusion. The two later steps are the drop rules in section 8 and DV-8, applied by script. The supplier rule looks for defined terms such as ("Seller") after a party name, and for sentences such as "X shall supply". When neither identifies exactly one provider, the contract is dropped rather than guessed. A person reading the 54 dropped contracts would recover many of them, which is the most direct way to close the gap.
+
+**Amendments: 0 of 20.** The EDGAR step is implemented but has not been run. The SEC requires a real contact email in the user agent (`EDGAR_USER_AGENT`), and none is configured. Until it is run, no amendments or paired originals are in the manifest. The matching logic pairs an amendment only with an original already in the CUAD selection, which may keep the count below 20 even after a run.
+
+**Suppliers: 63, above the 30 to 50 range.** The range in PRD 5 and the test conflicts with DV-7, which expects 100 to 140 suppliers because almost every CUAD contract is the only one from its company. The corpus has one supplier per contract, plus vendor suppliers, so it cannot reach both 120 contracts and 50 suppliers. The range needs a decision.
+
+### 14.2 Differences from the earlier sections
+
+- **Command line.** The script takes `--only cuad|edgar|vendor` and `--limit N`, not `--all`, `--cuad`, `--edgar`, `--vendor` or `--check`. There is no `--check` yet.
+- **Vendor documents.** 18 HTML pages from six vendors (Google Cloud, Amazon Web Services, Atlassian, Stripe, Twilio, HubSpot). PDFs are not used, because the date rule needs readable text and the script has no PDF reader. The AWS DPA stays excluded (no date, E-12). Several other candidates were dropped for a missing date or an error response.
+- **Title pattern count.** The new pattern matches 176 titles, not 168. The old pattern matches 301.
+- **PDF text-layer check.** Not done at fetch time, because that needs a PDF library. Every selected PDF has a text file with the same contract text in `data/raw/cuad/json_text/`, and the loader in PR 4 uses it when a PDF has no text layer (DV-2).
+- **`data/sources/`.** `cuad_index.csv` is not written. The CUAD title is the `title` column of the manifest, and the fetch log is `data/fetch_log.csv`.
+- **Committed files.** Only `manifest.csv`, `suppliers.csv` and `fetch_log.csv` are committed. Raw CUAD and EDGAR files are git-ignored, so a fresh clone runs `fetch_sources.py` to get them. The manifest test checks checksums when the raw files are present.
+- **Document IDs.** `doc_id` is `clausecheck.core.ids.doc_id(source, title)`, for example `cuad-1a2b3c4d5e6f`, not the `{SUPPLIER}-{TYPE}-{YEAR}` form in section 9.
+- **Column names.** The manifest uses `licence` and `url`, and `supplier_id`, `source = vendor`. Section 9 has `license`, `source_url`, `supplier`, `vendor_public`.
+- **Document types.** `contract`, `amendment`, `dpa`, `sla`, `price_schedule`, `certificate`.
+
