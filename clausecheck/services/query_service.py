@@ -13,6 +13,8 @@ from clausecheck.services.sessions import SessionStore
 from clausecheck.store.cache import AnswerCache, make_key
 from clausecheck.store.query_log import QueryLog
 
+OTHER_CONTRACT = "other_contract"  # refusal reason: the question names a different contract
+
 GENERIC_ERROR = (
     'ClauseCheck couldn\'t generate an answer right now. This is a system error, not a "not found".'
 )
@@ -148,13 +150,62 @@ class QueryService:
             record["error"] = result.answer
         self.query_log.log(record)
 
+    def _other_contract_reply(self, scope_id: str, rewritten: str) -> str | None:
+        """The refusal text if `rewritten` names a contract other than `scope_id`, else None.
+
+        A conversation fixed to one contract must not answer about another one: the search would
+        be limited to this contract and the answer would be presented as if it were about the
+        contract the user named.
+        """
+        other = self.supplier_detector.other_supplier(rewritten, scope_id)
+        if other is None:
+            return None
+        return (
+            f"This conversation is about {self.supplier_detector.display_name(scope_id)}. "
+            f"To ask about {self.supplier_detector.display_name(other)}, open that contract "
+            "and ask there."
+        )
+
+    def _other_contract_result(
+        self, query_id: str, question: str, rewritten: str, scope_id: str, message: str, t0: float
+    ) -> QueryResult:
+        total_ms = round((time.perf_counter() - t0) * 1000, 2)
+        result = QueryResult(
+            query_id=query_id,
+            question=question,
+            rewritten_question=rewritten,
+            supplier_id=scope_id,
+            answer=message,
+            citations=[],
+            outcome="refused",
+            refusal_reason=OTHER_CONTRACT,
+            unsupported=False,
+            cached=False,
+            timings={"total": total_ms},
+            prompt_version=self.generator.prompt.version,
+            index_version=self.index_version,
+            chunk_ids=[],
+        )
+        self._log(result, False, [], [], [])  # logged, but never cached or added to the history
+        return result
+
     def answer(
-        self, question: str, session_id: str | None = None, supplier_filter: str | None = None
+        self,
+        question: str,
+        session_id: str | None = None,
+        supplier_filter: str | None = None,
+        strict_scope: bool = False,
     ) -> QueryResult:
         query_id = self._new_id()
         t0 = time.perf_counter()
         session = self.sessions.get_or_create(session_id)
         rewritten = self.rewriter.rewrite(question, session.turns)
+        if strict_scope and supplier_filter is not None:
+            message = self._other_contract_reply(supplier_filter, rewritten)
+            if message is not None:
+                return self._other_contract_result(
+                    query_id, question, rewritten, supplier_filter, message, t0
+                )
         supplier = (
             supplier_filter
             if supplier_filter is not None
@@ -281,12 +332,44 @@ class QueryService:
         return result
 
     def stream(
-        self, question: str, session_id: str | None = None, supplier_filter: str | None = None
+        self,
+        question: str,
+        session_id: str | None = None,
+        supplier_filter: str | None = None,
+        strict_scope: bool = False,
     ) -> Iterator[StreamEvent]:
         query_id = self._new_id()
         t0 = time.perf_counter()
         session = self.sessions.get_or_create(session_id)
         rewritten = self.rewriter.rewrite(question, session.turns)
+        if strict_scope and supplier_filter is not None:
+            message = self._other_contract_reply(supplier_filter, rewritten)
+            if message is not None:
+                result = self._other_contract_result(
+                    query_id, question, rewritten, supplier_filter, message, t0
+                )
+                yield StreamEvent(
+                    "meta",
+                    {
+                        "query_id": query_id,
+                        "supplier_id": supplier_filter,
+                        "rewritten_question": rewritten,
+                    },
+                )
+                yield StreamEvent("sources", {"sources": []})
+                yield StreamEvent("token", {"text": message})
+                yield StreamEvent("citations", {"citations": [], "unsupported": False})
+                total_ms = result.timings["total"]
+                yield StreamEvent(
+                    "done",
+                    {
+                        "outcome": "refused",
+                        "refusal_reason": OTHER_CONTRACT,
+                        "cached": False,
+                        "timings": {"ttft": total_ms, "total": total_ms},
+                    },
+                )
+                return
         supplier = (
             supplier_filter
             if supplier_filter is not None

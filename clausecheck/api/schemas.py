@@ -16,6 +16,8 @@ class ChatRequest(BaseModel):
     question: str = Field(min_length=1, max_length=1000)
     session_id: str | None = None
     supplier_id: str | None = None
+    # True: the conversation is about this one contract; a question naming another is refused
+    strict_scope: bool = False
 
 
 class ChatResponse(BaseModel):

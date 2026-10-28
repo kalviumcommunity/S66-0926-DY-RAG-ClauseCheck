@@ -203,7 +203,12 @@ class UploadService:
         return "".join(c if c.isalnum() or c in "._-" else "_" for c in filename)
 
     def submit(
-        self, filename: str, content: bytes, supplier_id: str, doc_type: str = "contract"
+        self,
+        filename: str,
+        content: bytes,
+        supplier_id: str,
+        doc_type: str = "contract",
+        display_name: str | None = None,
     ) -> str:
         sha = self._sha256(content)
         # duplicate check
@@ -237,10 +242,12 @@ class UploadService:
 
         dest.write_bytes(content)
 
-        self.executor.submit(self._run, job_id, filename, content, supplier_id, doc_type, sha, dest)
+        self.executor.submit(
+            self._run, job_id, filename, content, supplier_id, doc_type, sha, dest, display_name
+        )
         return job_id
 
-    def _run(self, job_id, filename, content, supplier_id, doc_type, sha, dest):
+    def _run(self, job_id, filename, content, supplier_id, doc_type, sha, dest, display_name=None):
         from pathlib import Path
 
         from clausecheck.core import ids
@@ -281,8 +288,11 @@ class UploadService:
                 if not conn.execute(
                     "SELECT 1 FROM suppliers WHERE supplier_id=?", (supplier_id,)
                 ).fetchone():
-                    name = " ".join(supplier_id.replace("-", " ").replace("_", " ").split())
-                    db.upsert_supplier(conn, supplier_id, name.title(), [supplier_id])
+                    name = (
+                        display_name
+                        or " ".join(supplier_id.replace("-", " ").replace("_", " ").split()).title()
+                    )
+                    db.upsert_supplier(conn, supplier_id, name, [supplier_id])
             except Exception:
                 pass
 

@@ -38,6 +38,17 @@ class SessionStore:
                 self._sessions[session_id] = Session(session_id=session_id)
             return self._sessions[session_id]
 
+    def scope_of(self, session_id: str | None) -> str | None:
+        """The supplier a conversation is about (set by its first answer), or None.
+
+        Does not create the session.
+        """
+        if session_id is None:
+            return None
+        with self._lock:
+            session = self._sessions.get(session_id)
+            return session.supplier_id if session else None
+
     def append(self, session_id: str, question: str, answer: str, supplier_id: str | None) -> None:
         with self._lock:
             session = self._sessions.get(session_id)
