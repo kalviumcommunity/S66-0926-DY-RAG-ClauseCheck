@@ -11,4 +11,8 @@ def test_app_renders_without_backend():
     at.run()
     assert not at.exception
     assert len(at.error) >= 1
-    assert len(at.tabs) == 2
+    # The page layout changed from two tabs (Chat, Insights) to three pages (Chat, New contract
+    # analyser, Insights), so the old `len(at.tabs) == 2` check no longer applies. With no
+    # backend, the Chat page has no contracts to offer and says so instead of showing a chat.
+    assert any("no contracts" in i.value.lower() for i in at.info)
+    assert len(at.chat_input) == 0

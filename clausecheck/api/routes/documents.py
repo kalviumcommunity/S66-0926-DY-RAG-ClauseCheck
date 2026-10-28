@@ -42,6 +42,7 @@ async def upload_document(
     file: UploadFile = File(...),
     supplier_id: str = Form(...),
     doc_type: str = Form("contract"),
+    display_name: str = Form(""),
     container=Depends(get_container),
 ):
     settings = container.settings
@@ -61,7 +62,9 @@ async def upload_document(
     if service is None:
         return JSONResponse(status_code=503, content={"detail": "upload service unavailable"})
     try:
-        job_id = service.submit(file.filename or "upload", content, supplier_id, doc_type)
+        # only sent when given, so a service without display_name support keeps working
+        extra = {"display_name": display_name.strip()} if display_name.strip() else {}
+        job_id = service.submit(file.filename or "upload", content, supplier_id, doc_type, **extra)
     except DuplicateDocumentError as exc:
         return JSONResponse(status_code=409, content={"detail": "duplicate", "doc_id": exc.doc_id})
     return {"job_id": job_id}

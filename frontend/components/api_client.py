@@ -36,9 +36,23 @@ class ApiClient:
     def chunk(self, chunk_id: str) -> dict[str, Any]:
         return self._request("GET", f"/chunks/{chunk_id}").json()
 
-    def upload(self, filename: str, content: bytes, supplier_id: str, doc_type: str = "contract"):
+    def documents(self, supplier_id: str) -> list[dict[str, Any]]:
+        """The documents of one contract (a contract and its amendments, certificates, ...)."""
+        params = {"supplier_id": supplier_id, "limit": 200}
+        return self._request("GET", "/documents", params=params).json()["items"]
+
+    def upload(
+        self,
+        filename: str,
+        content: bytes,
+        supplier_id: str,
+        doc_type: str = "contract",
+        display_name: str | None = None,
+    ):
         files = {"file": (filename, content)}
         data = {"supplier_id": supplier_id, "doc_type": doc_type}
+        if display_name:
+            data["display_name"] = display_name
         r = self._request_raw("POST", "/documents", files=files, data=data)
         if r.status_code == 409:
             body = r.json()

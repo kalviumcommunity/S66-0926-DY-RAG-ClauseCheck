@@ -8,7 +8,8 @@ do not answer the question, it says so instead of guessing.
 > Net 30 term [C1]", because an uploaded amendment changed clause 5.1, and the answer says so.
 
 **Version 1** (`v1.0.0`). What changed to get here, and what is still open, is in
-[debugging.md](debugging.md).
+[debugging.md](debugging.md). Since `v1.0.0`: every contract has its own conversation, and there
+is a separate New contract analyser page; see [version02.md](version02.md).
 
 ## What it does
 
@@ -17,19 +18,27 @@ do not answer the question, it says so instead of guessing.
   into a refusal.
 - **Understands amendments.** An uploaded amendment is recognised, dated and linked to the agreement
   it changes. Answers give the amended term and say what it replaced.
+- **One conversation per contract.** You choose a contract, and the search and the conversation
+  are limited to it. Every contract keeps its own history, and a question that names a different
+  contract is refused with a pointer to that contract, so an answer is never about the wrong one.
 - **Keeps the conversation.** Follow-ups ("And for disaster recovery?") are rewritten into full
-  questions and stay on the same supplier.
-- **Takes your own documents.** Upload PDF, HTML, DOCX or TXT files from the sidebar.
+  questions and stay on the same contract.
+- **Analyses your own contract.** The **New contract analyser** page takes a contract and its
+  amendments (PDF, HTML, DOCX or TXT) and opens a chat about just that contract.
 - **Warns about unsupported numbers.** If a sentence in the answer has no citation, the app shows a
   "check it before acting" notice.
 
 ## How an answer is produced
 
 ```
-question -> rewrite follow-up -> find the supplier -> hybrid search (vector + keyword, fused)
-         -> add linked amendment clauses -> re-rank -> relevance check -> build numbered context
-         -> LLM answer -> check citations -> stream to the browser
+question -> rewrite follow-up -> stay on the chosen contract (refuse if it names another one)
+         -> hybrid search (vector + keyword, fused) -> add linked amendment clauses -> re-rank
+         -> relevance check -> build numbered context -> LLM answer -> check citations
+         -> stream to the browser
 ```
+
+The Chat and New contract analyser pages always send the chosen contract, so the search never
+leaves it. Called without one, the API finds the supplier named in the question instead.
 
 | Part | What is used |
 |---|---|
@@ -142,14 +151,28 @@ Open <http://localhost:8501>. If the backend is somewhere else, start the app wi
 
 ## Using the app
 
-- **Ask a question.** Pick a supplier in the sidebar to limit the search to that supplier, or leave
-  "All suppliers" and name the supplier in the question. Open a citation under the answer and click "View full clause" to read it.
-- **Upload a document.** Choose the file, enter a **Supplier ID** (required, for example
-  `helixa-cloud-systems`) and a document type, then click Upload.
-- **Upload the original agreement before its amendment.** The amendment is then linked to it
-  automatically and answers use the amended terms. Use the same Supplier ID for both.
-- **Thumbs up or down** on an answer is saved in the database (`feedback` table). The Insights tab
-  shows usage figures from the query log.
+The sidebar has three pages.
+
+**Chat**
+- **Choose a contract** in the sidebar. Until you do, there is no chat box. Each contract has its
+  own conversation; switching contracts switches conversations and nothing carries over.
+- **Ask a question.** Open a citation under the answer and click "View full clause" to read it.
+  If you name another contract in the question, you get a message telling you to open that
+  contract instead.
+- **Documents in this contract** lists the contract's files, their dates and which agreement each
+  amendment changes. **Add a document to this contract** uploads another file to it, for example
+  a later amendment.
+- **New conversation** (sidebar) starts over for the current contract only.
+
+**New contract analyser**
+1. Type a **contract name**, choose the **contract file**, and add its **amendments** if it has any.
+2. Click **Analyse contract**. The original is indexed first and each amendment after it, so every
+   amendment is linked to the agreement it changes and answers use the amended terms.
+3. The page lists the documents it found and warns about any amendment it could not link, then
+   opens a chat about that contract. It stays available on the Chat page afterwards.
+
+**Insights** shows usage figures from the query log. A thumbs up or down on an answer is saved in
+the database (`feedback` table).
 
 ## Settings
 
@@ -186,10 +209,35 @@ python scripts/usage_report.py
 ## Tests and evaluation
 
 ```bash
-pytest -q -m "not targets"        # 262 pass; 2 end-to-end tests are skipped without a server
+pytest -q -m "not targets"        # 304 pass, 4 are skipped (they need a running backend)
 ruff check . && black --check .
+```
 
-# Ten live questions from the labelled set through the whole pipeline (uses your API keys)
+| Folder | What it covers | Tests |
+|---|---|---|
+| `tests/unit/` | One module at a time: chunker, cleaner, retrieval fusion, re-ranker, supplier detector, citation checker, settings, the eval runner as a command | 212 |
+| `tests/integration/` | Several parts together with fake models: ingest, hybrid retrieval, the query service, uploads, one conversation per contract | 30 |
+| `tests/api/` | The FastAPI endpoints with a fake query service, including that no secret leaks | 27 |
+| `tests/frontend/` | The Streamlit pages run with Streamlit's test tool and a stand-in API: contract picker, separate conversations, the analyser form, adding a document | 35 |
+| `tests/e2e/` | The real backend and index; skipped unless you opt in (below) | 4 |
+
+The tests never call a real model. The end-to-end tests and the evaluation do, and say so. One more
+test, `test_corpus_targets`, is left out with `-m "not targets"` because the corpus is smaller than
+its target (see `docs/data/data-sourcing.md`).
+
+Run one folder, or the end-to-end tests against the backend you started in step 4:
+
+```bash
+pytest -q tests/frontend
+
+# needs the backend running and an index with at least two contracts; makes a few model calls
+CLAUSECHECK_E2E=1 CLAUSECHECK_API_URL=http://localhost:7860 pytest tests/e2e -q
+```
+
+**Evaluation.** Ten labelled questions through the whole pipeline, with the judge model (uses your API
+keys):
+
+```bash
 python -m eval.run_eval --split tune --stage e2e --limit 10
 ```
 
@@ -205,13 +253,13 @@ the tests and a dry-run ingest on pull requests, and the `eval-smoke` job on pus
 | `/health` says `degraded` | The index is empty or has no vectors. Run `python -m clausecheck.ingest`. |
 | `address already in use` | An older server holds the port: `lsof -ti tcp:7860 | xargs kill`. |
 | Old answers after changing the index or threshold | The cache. Run the `DELETE FROM answer_cache` command above. |
-| "I couldn't find this" for something in a contract | Name the supplier in the question or pick it in the sidebar, and upload the original before its amendment. Rewording usually helps. |
+| "I couldn't find this" for something in a contract | Check that the right contract is chosen on the Chat page, and that the original was uploaded before its amendment. Rewording usually helps. |
+| "This conversation is about X. To ask about Y, open that contract" | You named a different contract in the question. Each conversation covers one contract; pick the other one on the Chat page. |
 | `404 model not found` in the log | A provider retired the model; set a current `GEMINI_MODEL` or `GROQ_MODEL`. |
 | `pip install` times out | Add `--default-timeout 120 --retries 10`. On a network that inspects HTTPS, pip may also need the proxy's certificate. |
 
-## Known limits in version 1
+## Known limits
 
-- One conversation can switch between contracts; separate chats per contract are not built yet.
 - When both Groq and Gemini fail (rate limits), a request can take 40+ seconds and end in the
   generic error message.
 - About 1 in 30 answerable test questions is still declined by the model.
@@ -223,7 +271,7 @@ the tests and a dry-run ingest on pull requests, and the `eval-smoke` job on pus
 | Path | What is in it |
 |---|---|
 | `clausecheck/` | The Python package: `core`, `ingest`, `rag`, `store`, `llm`, `services`, `api`, `prompts` |
-| `frontend/` | Streamlit app |
+| `frontend/` | Streamlit app: `app.py` sets up the pages in `views/` (Chat, New contract analyser, Insights); shared code is in `components/` |
 | `scripts/` | Corpus download, synthetic data, validation, bootstrap and usage report |
 | `eval/` | Labelled questions, evaluation runner and results |
 | `data/` | Corpus manifest and suppliers list; `raw/` and `uploads/` are git-ignored |

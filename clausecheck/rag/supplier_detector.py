@@ -24,10 +24,32 @@ class SupplierDetector:
     def __init__(self, suppliers: list[dict], min_score: int = 85):
         self.min_score = min_score
         self._names: list[tuple[str, str]] = []  # (lowercase name, supplier_id)
+        self._display: dict[str, str] = {}
         for s in suppliers:
+            self._display[s["supplier_id"]] = s["display_name"]
             for name in [s["display_name"], *s.get("aliases", [])]:
                 if len(name.strip()) >= MIN_NAME_LENGTH:
                     self._names.append((name.strip().lower(), s["supplier_id"]))
+
+    def display_name(self, supplier_id: str) -> str:
+        """The name to show for a supplier; the ID itself if it is unknown."""
+        return self._display.get(supplier_id, supplier_id)
+
+    def other_supplier(self, question: str, scope_id: str) -> str | None:
+        """A supplier other than `scope_id` that the question names, or None.
+
+        Used inside a conversation that is about one contract: a question that names another
+        contract must not be answered from this one.
+        """
+        text = question.lower()
+        best: tuple[float, int, str] | None = None
+        for name, supplier_id in self._names:
+            if supplier_id == scope_id:
+                continue
+            candidate = (_score(name, text), len(name), supplier_id)
+            if candidate[0] >= self.min_score and (best is None or candidate[:2] > best[:2]):
+                best = candidate
+        return best[2] if best else None
 
     @classmethod
     def from_conn(cls, conn: sqlite3.Connection, min_score: int = 85) -> "SupplierDetector":
