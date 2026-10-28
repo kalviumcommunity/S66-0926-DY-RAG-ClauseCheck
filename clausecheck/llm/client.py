@@ -1,6 +1,7 @@
 """One LLM client with retries on the primary provider and a fallback provider."""
 
 import logging
+import re
 from collections.abc import Callable, Iterator
 from typing import TYPE_CHECKING, Protocol, TypeVar
 
@@ -35,8 +36,24 @@ def provider_error(provider: str, exc: Exception) -> ProviderError:
     return ProviderError(reason)
 
 
+REASON_RE = re.compile(r"[A-Za-z_]+(?: \d{3})?")
+
+
+def safe_reason(provider: str, reason: str) -> str:
+    """`groq: RateLimitError 429`. Anything that is not a class name and a status becomes `error`,
+    so a provider message that echoes request data can never reach the logs."""
+    return f"{provider}: {reason if REASON_RE.fullmatch(reason) else 'error'}"
+
+
 class LLMError(Exception):
-    """Raised by the client when every provider has failed. Never carries provider text."""
+    """Raised by the client when every provider has failed. Never carries provider text.
+
+    `reasons` says why each provider failed, as `provider: ErrorType status` (see `safe_reason`).
+    """
+
+    def __init__(self, message: str, reasons: list[str] | None = None) -> None:
+        super().__init__(message)
+        self.reasons = reasons or []
 
 
 class LLMProvider(Protocol):
@@ -126,15 +143,18 @@ class LLMClient:
         raise AssertionError("unreachable")  # pragma: no cover
 
     def _run(self, make_call: Callable[[LLMProvider], Callable[[], T]]) -> T:
+        reasons: list[str] = []
         for provider in self._providers:
             try:
                 return self._attempt(provider, make_call(provider))
-            except ProviderError:
-                continue
-        raise self._failure()
+            except ProviderError as exc:
+                reasons.append(safe_reason(provider.name, str(exc)))
+        raise self._failure(reasons)
 
-    def _failure(self) -> LLMError:
-        return LLMError("All LLM providers failed: " + ", ".join(p.name for p in self._providers))
+    def _failure(self, reasons: list[str] | None = None) -> LLMError:
+        return LLMError(
+            "All LLM providers failed: " + ", ".join(p.name for p in self._providers), reasons
+        )
 
     def complete(self, prompt: str, **kw) -> str:
         """Return a completion, falling back to the second provider if needed."""
@@ -165,5 +185,5 @@ class LLMClient:
         yield first  # type: ignore[misc]
         try:
             yield from it
-        except ProviderError:
-            raise self._failure() from None
+        except ProviderError as exc:
+            raise self._failure([safe_reason("stream", str(exc))]) from None

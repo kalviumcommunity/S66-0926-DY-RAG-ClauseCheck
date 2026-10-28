@@ -9,7 +9,9 @@ do not answer the question, it says so instead of guessing.
 
 **Version 1** (`v1.0.0`). What changed to get here, and what is still open, is in
 [debugging.md](debugging.md). Since `v1.0.0`: every contract has its own conversation, and there
-is a separate New contract analyser page; see [version02.md](version02.md).
+is a separate New contract analyser page ([version02.md](version02.md)); the interface was then
+redesigned to the website spec, with a contract register, checked answers and a service report
+([version03.md](version03.md)).
 
 ## What it does
 
@@ -23,8 +25,8 @@ is a separate New contract analyser page; see [version02.md](version02.md).
   contract is refused with a pointer to that contract, so an answer is never about the wrong one.
 - **Keeps the conversation.** Follow-ups ("And for disaster recovery?") are rewritten into full
   questions and stay on the same contract.
-- **Analyses your own contract.** The **New contract analyser** page takes a contract and its
-  amendments (PDF, HTML, DOCX or TXT) and opens a chat about just that contract.
+- **Files your own contract.** The **Contracts** page takes a contract and its amendments (PDF,
+  HTML, DOCX or TXT), shows each indexing step as it happens, and then lets you check its terms.
 - **Warns about unsupported numbers.** If a sentence in the answer has no citation, the app shows a
   "check it before acting" notice.
 
@@ -37,7 +39,7 @@ question -> rewrite follow-up -> stay on the chosen contract (refuse if it names
          -> stream to the browser
 ```
 
-The Chat and New contract analyser pages always send the chosen contract, so the search never
+The Ask and Contracts pages always send the chosen contract, so the search never
 leaves it. Called without one, the API finds the supplier named in the question instead.
 
 | Part | What is used |
@@ -48,7 +50,7 @@ leaves it. Called without one, the API finds the supplier named in the question 
 | Keyword search | BM25 over every chunk, built in memory at start-up |
 | Re-ranker | `cross-encoder/ms-marco-MiniLM-L-6-v2` |
 | Storage | SQLite (`index/clausecheck.db`) for documents, chunks, suppliers, the answer cache, the query log and feedback. Conversation history is kept in memory, so it is lost when the backend restarts. |
-| Backend | FastAPI on port 7860 (`/chat`, `/chat/stream`, `/documents`, `/suppliers`, `/health`, ...) |
+| Backend | FastAPI on port 7860 (`/chat`, `/chat/stream`, `/documents`, `/contracts`, `/checks/recent`, `/insights/report`, `/suppliers`, `/health`, ...) |
 | Frontend | Streamlit on port 8501 |
 
 ## The data
@@ -144,35 +146,52 @@ source .venv/bin/activate
 streamlit run frontend/app.py
 ```
 
-Open <http://localhost:8501>. If the backend is somewhere else, start the app with
+Run it from the repository root, so Streamlit finds `.streamlit/config.toml` (theme, 20 MB upload
+limit) and the fonts in `frontend/static/`. After changing code or CSS, restart it. Open
+<http://localhost:8501>. If the backend is somewhere else, start the app with
 `API_BASE_URL=http://host:port streamlit run frontend/app.py`.
 
 **Stop** with `Ctrl+C` in each terminal. If port 7860 is still busy: `lsof -ti tcp:7860 | xargs kill`.
 
 ## Using the app
 
-The sidebar has three pages.
+There is no sidebar. The tabs at the top are **Ask**, **Contracts** and **Insights**, with the
+index status beside them and the five headline numbers under them.
 
-**Chat**
-- **Choose a contract** in the sidebar. Until you do, there is no chat box. Each contract has its
-  own conversation; switching contracts switches conversations and nothing carries over.
-- **Ask a question.** Open a citation under the answer and click "View full clause" to read it.
-  If you name another contract in the question, you get a message telling you to open that
-  contract instead.
-- **Documents in this contract** lists the contract's files, their dates and which agreement each
-  amendment changes. **Add a document to this contract** uploads another file to it, for example
-  a later amendment.
-- **New conversation** (sidebar) starts over for the current contract only.
+**Ask**
+- The page opens on the **contract register**. Search it, or press **Check** on a row. Each contract
+  has its own conversation, so nothing carries over between contracts.
+- Type a question. While it runs you see the real steps and their times. The result is a **check
+  record**: the answer, a **Terms found** table (value, source, status), and a seal. **Checked**
+  means every citation and number was found in the cited clauses; **Verify** names what was not.
+  The cited clause is shown on the right as a page, with the words the answer relies on
+  highlighted; **C1, C2…** switch between clauses.
+- **No term found** means the contract has nothing on it, and nothing was guessed. A red **System
+  failure** is not a finding; use **Try again**.
+- **Documents (n)** lists the contract's files and which agreement each amendment changes.
+  **New check** starts over for this contract only. **Download as a note** saves a check as text.
 
-**New contract analyser**
-1. Type a **contract name**, choose the **contract file**, and add its **amendments** if it has any.
-2. Click **Analyse contract**. The original is indexed first and each amendment after it, so every
-   amendment is linked to the agreement it changes and answers use the amended terms.
-3. The page lists the documents it found and warns about any amendment it could not link, then
-   opens a chat about that contract. It stays available on the Chat page afterwards.
+**Contracts**
+1. Name the contract, choose the main agreement, its type and its effective date (as written in
+   the contract; leave it empty to read it from the document).
+2. Add amendments in the order they were signed, each with its date and the document it changes.
+3. **File and index.** The filing log on the right lists each step with its time and counts. When
+   it is ready, **Check** opens the contract on the Ask page. The same page can add a document to
+   the contract you are checking.
 
-**Insights** shows usage figures from the query log. A thumbs up or down on an answer is saved in
-the database (`feedback` table).
+**Insights** is a dated service report: a one-sentence headline, a scorecard against the targets,
+the outcomes, what people asked about, the unanswered questions and the failures, with a CSV
+download. The targets are 80% of questions answered with sources, first words within 3.0 s, a
+checked answer within 30.0 s and 90% citation accuracy. A measure that has not been taken (citation
+accuracy, until `python -m eval.run_eval` has run) is shown as "Not measured", not as zero.
+
+**Landing page.** `site/index.html` is a static page (open it, or host it anywhere) with a real
+screenshot of the app and the latest figures from `site/results.json`. Refresh the figures with
+`python scripts/update_site_data.py`. Its "Open ClauseCheck" button points to
+`http://localhost:8501`; change it when the app has a URL.
+
+Everything about this redesign, including where it differs from the spec, is in
+[version03.md](version03.md).
 
 ## Settings
 
@@ -209,16 +228,16 @@ python scripts/usage_report.py
 ## Tests and evaluation
 
 ```bash
-pytest -q -m "not targets"        # 304 pass, 4 are skipped (they need a running backend)
+pytest -q -m "not targets"        # 375 pass, 4 are skipped (they need a running backend)
 ruff check . && black --check .
 ```
 
 | Folder | What it covers | Tests |
 |---|---|---|
-| `tests/unit/` | One module at a time: chunker, cleaner, retrieval fusion, re-ranker, supplier detector, citation checker, settings, the eval runner as a command | 212 |
-| `tests/integration/` | Several parts together with fake models: ingest, hybrid retrieval, the query service, uploads, one conversation per contract | 30 |
-| `tests/api/` | The FastAPI endpoints with a fake query service, including that no secret leaks | 27 |
-| `tests/frontend/` | The Streamlit pages run with Streamlit's test tool and a stand-in API: contract picker, separate conversations, the analyser form, adding a document | 35 |
+| `tests/unit/` | One module at a time: chunker, cleaner, retrieval fusion, re-ranker, supplier detector, citation checker, settings, the eval runner as a command | 247 |
+| `tests/integration/` | Several parts together with fake models: ingest, hybrid retrieval, the query service, uploads, one conversation per contract | 54 |
+| `tests/api/` | The FastAPI endpoints with a fake query service, including that no secret leaks | 34 |
+| `tests/frontend/` | The Streamlit pages run with Streamlit's test tool and a stand-in API (register, scoped checks, every outcome state, the filing form, the report), plus the formatting and HTML helpers | 41 |
 | `tests/e2e/` | The real backend and index; skipped unless you opt in (below) | 4 |
 
 The tests never call a real model. The end-to-end tests and the evaluation do, and say so. One more
@@ -253,8 +272,8 @@ the tests and a dry-run ingest on pull requests, and the `eval-smoke` job on pus
 | `/health` says `degraded` | The index is empty or has no vectors. Run `python -m clausecheck.ingest`. |
 | `address already in use` | An older server holds the port: `lsof -ti tcp:7860 | xargs kill`. |
 | Old answers after changing the index or threshold | The cache. Run the `DELETE FROM answer_cache` command above. |
-| "I couldn't find this" for something in a contract | Check that the right contract is chosen on the Chat page, and that the original was uploaded before its amendment. Rewording usually helps. |
-| "This conversation is about X. To ask about Y, open that contract" | You named a different contract in the question. Each conversation covers one contract; pick the other one on the Chat page. |
+| "I couldn't find this" for something in a contract | Check that the right contract is chosen on the Ask page, and that the original was uploaded before its amendment. Rewording usually helps. |
+| "This conversation is about X. To ask about Y, open that contract" | You named a different contract in the question. Each conversation covers one contract; choose the other one in the register on the Ask page. |
 | `404 model not found` in the log | A provider retired the model; set a current `GEMINI_MODEL` or `GROQ_MODEL`. |
 | `pip install` times out | Add `--default-timeout 120 --retries 10`. On a network that inspects HTTPS, pip may also need the proxy's certificate. |
 
@@ -271,7 +290,8 @@ the tests and a dry-run ingest on pull requests, and the `eval-smoke` job on pus
 | Path | What is in it |
 |---|---|
 | `clausecheck/` | The Python package: `core`, `ingest`, `rag`, `store`, `llm`, `services`, `api`, `prompts` |
-| `frontend/` | Streamlit app: `app.py` sets up the pages in `views/` (Chat, New contract analyser, Insights); shared code is in `components/` |
+| `site/` | The static landing page; `scripts/update_site_data.py` writes its `results.json` |
+| `frontend/` | Streamlit app: `app.py` sets up the pages in `views/` (Ask, Contracts, Insights); shared code is in `components/` |
 | `scripts/` | Corpus download, synthetic data, validation, bootstrap and usage report |
 | `eval/` | Labelled questions, evaluation runner and results |
 | `data/` | Corpus manifest and suppliers list; `raw/` and `uploads/` are git-ignored |

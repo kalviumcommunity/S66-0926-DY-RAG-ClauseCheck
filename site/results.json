@@ -1,0 +1,49 @@
+{
+  "generated_at": "2026-10-28T05:31:38Z",
+  "window": "Last 7 days",
+  "questions": 604,
+  "index": {
+    "contracts": 76,
+    "documents": 171,
+    "last_indexed": "2026-10-27T22:14:20Z"
+  },
+  "headline": "One of three measured targets was met. Fewer questions were answered with sources than planned, first words arrived just over target, and citation accuracy has not yet been measured.",
+  "scorecard": [
+    {
+      "key": "answered_rate",
+      "label": "Answered with sources",
+      "value": 0.6837748344370861,
+      "target": 0.8,
+      "direction": "min",
+      "status": "below",
+      "basis": "413 of 604 questions, errors included"
+    },
+    {
+      "key": "ttft_ms",
+      "label": "First words appear (median)",
+      "value": 3080.17,
+      "target": 3000.0,
+      "direction": "max",
+      "status": "above",
+      "basis": "Median of 604 questions"
+    },
+    {
+      "key": "checked_ms",
+      "label": "Checked answer (median)",
+      "value": 3617.16,
+      "target": 30000.0,
+      "direction": "max",
+      "status": "met",
+      "basis": "Median of 413 answers"
+    },
+    {
+      "key": "citation_accuracy",
+      "label": "Citation accuracy",
+      "value": null,
+      "target": 0.9,
+      "direction": "min",
+      "status": "not_measured",
+      "basis": "Run eval.run_eval on the held-out set"
+    }
+  ]
+}

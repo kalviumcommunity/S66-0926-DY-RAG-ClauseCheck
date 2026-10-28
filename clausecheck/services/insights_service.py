@@ -1,6 +1,22 @@
+import datetime as dt
+import json
 import sqlite3
 from collections import Counter, defaultdict
 from pathlib import Path
+
+from clausecheck.services.contracts_service import outcome_label
+from clausecheck.services.topics import NOT_CLASSIFIED, classify
+from clausecheck.store.query_log import QueryLog
+
+# the targets the report measures against (docs/requirements and mock-ux UX-9)
+TARGETS = {
+    "answered_rate": 0.80,
+    "ttft_ms": 3000.0,
+    "checked_ms": 30000.0,
+    "citation_accuracy": 0.90,
+}
+WINDOWS = {7: "Last 7 days", 30: "Last 30 days", None: "All time"}
+NUMBER_WORDS = {0: "None", 1: "One", 2: "Two", 3: "Three", 4: "Four"}
 
 
 class InsightsService:
@@ -91,6 +107,176 @@ class InsightsService:
             "documents_by_source": documents_by_source,
         }
 
+    def report(
+        self,
+        days: int | None = 7,
+        contract_id: str | None = None,
+        now: dt.datetime | None = None,
+        results_dir: Path = Path("eval/results"),
+    ) -> dict:
+        """The service report: figures, targets and their status, for one window and contract.
+
+        Unlike `kpis`, the answer rate counts system failures as not answered, so a day with
+        outages cannot look better than it was.
+        """
+        now = now or dt.datetime.now(dt.UTC)
+        QueryLog(self.conn)  # a database that has never answered a question has no log table yet
+        sql = (
+            "SELECT query_id, created_at, supplier_id, question, outcome, latency_ms, ttft_ms, "
+            "error FROM query_log WHERE 1=1"
+        )
+        args: list = []
+        if days:
+            cutoff = (now - dt.timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+            sql += " AND created_at >= ?"
+            args.append(cutoff)
+        if contract_id:
+            sql += " AND supplier_id = ?"
+            args.append(contract_id)
+        rows = self.conn.execute(sql + " ORDER BY created_at DESC", args).fetchall()
+        names = {
+            r["supplier_id"]: r["display_name"]
+            for r in self.conn.execute("SELECT * FROM suppliers")
+        }
+
+        total = len(rows)
+        outcomes = Counter(r["outcome"] for r in rows)
+        answered = outcomes.get("answered", 0)
+        ttft = _median([r["ttft_ms"] for r in rows if r["ttft_ms"] is not None])
+        checked = _median(
+            [
+                r["latency_ms"]
+                for r in rows
+                if r["outcome"] == "answered" and r["latency_ms"] is not None
+            ]
+        )
+        accuracy = self._heldout_citation_accuracy(results_dir)
+
+        scorecard = [
+            _score(
+                "answered_rate",
+                "Answered with sources",
+                answered / total if total else None,
+                TARGETS["answered_rate"],
+                "min",
+                f"{answered} of {total} questions, errors included",
+            ),
+            _score(
+                "ttft_ms",
+                "First words appear (median)",
+                ttft if total else None,
+                TARGETS["ttft_ms"],
+                "max",
+                f"Median of {total} questions",
+            ),
+            _score(
+                "checked_ms",
+                "Checked answer (median)",
+                checked if answered else None,
+                TARGETS["checked_ms"],
+                "max",
+                f"Median of {answered} answers",
+            ),
+            _score(
+                "citation_accuracy",
+                "Citation accuracy",
+                accuracy["value"],
+                TARGETS["citation_accuracy"],
+                "min",
+                (
+                    f"Held-out set, {accuracy['date']}"
+                    if accuracy["value"] is not None
+                    else "Run eval.run_eval on the held-out set"
+                ),
+            ),
+        ]
+        topics = Counter(classify(r["question"]) for r in rows)
+        unclassified = topics.get(NOT_CLASSIFIED, 0)
+        failures = Counter(
+            (
+                r["error"]
+                if r["error"] and not r["error"].startswith("ClauseCheck couldn't")
+                else "Cause not recorded"
+            )
+            for r in rows
+            if r["outcome"] == "error"
+        )
+        days_with_data = len({(r["created_at"] or "")[:10] for r in rows})
+        daily: dict[str, Counter] = defaultdict(Counter)
+        for r in rows:
+            daily[(r["created_at"] or "")[:10]][r["outcome"]] += 1
+
+        unanswered = []
+        for r in rows:
+            if r["outcome"] not in ("refused", "error"):
+                continue
+            label, kind = outcome_label(r["outcome"], 0, False)
+            unanswered.append(
+                {
+                    "at": r["created_at"],
+                    "contract": names.get(r["supplier_id"]) or r["supplier_id"] or "",
+                    "question": " ".join((r["question"] or "").split()),
+                    "outcome": label,
+                    "kind": kind,
+                }
+            )
+            if len(unanswered) == 10:
+                break
+
+        index = self.conn.execute(
+            "SELECT COUNT(DISTINCT supplier_id) AS contracts, COUNT(*) AS documents, "
+            "MAX(ingested_at) AS last FROM documents"
+        ).fetchone()
+        notes = []
+        measured_rate = answered / (answered + outcomes.get("refused", 0)) if total else None
+        if total and outcomes.get("error"):
+            notes.append(
+                "Answer rate counts system failures as unanswered; excluding them it would be "
+                f"{round(measured_rate * 100)}%."
+            )
+        if total and unclassified / total > 0.2:
+            notes.append(
+                f"{round(unclassified / total * 100)}% of questions match no topic; the topic list "
+                "needs new categories."
+            )
+        notes.append("Topics come from a keyword classifier; questions that match none are shown.")
+        notes.append("The log does not tell evaluation and test questions apart from live use.")
+
+        return {
+            "generated_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "window": {"days": days, "label": WINDOWS.get(days, f"Last {days} days")},
+            "contract_id": contract_id,
+            "contract": names.get(contract_id) if contract_id else None,
+            "index": {
+                "contracts": index["contracts"],
+                "documents": index["documents"],
+                "last_indexed": index["last"],
+            },
+            "questions": total,
+            "outcomes": {k: outcomes.get(k, 0) for k in ("answered", "refused", "error")},
+            "scorecard": scorecard,
+            "headline": _headline(scorecard),
+            "topics": [{"topic": t, "count": n} for t, n in topics.most_common()],
+            "unclassified_share": unclassified / total if total else 0.0,
+            "unanswered": unanswered,
+            "failures": [{"cause": c, "count": n} for c, n in failures.most_common()],
+            "days_with_data": days_with_data,
+            "daily": [{"day": d, "counts": dict(c)} for d, c in sorted(daily.items())],
+            "notes": notes,
+        }
+
+    @staticmethod
+    def _heldout_citation_accuracy(results_dir: Path) -> dict:
+        """Citation accuracy from the newest held-out end-to-end run, if there is one."""
+        try:
+            for path in sorted(Path(results_dir).glob("*_e2e_heldout.json"), reverse=True):
+                value = (json.loads(path.read_text()).get("metrics") or {}).get("citation_accuracy")
+                if value is not None:
+                    return {"value": value, "date": path.name[:10]}
+        except (OSError, ValueError):
+            pass
+        return {"value": None, "date": None}
+
     def tables(self) -> dict:
         # supplier activity
         activity = []
@@ -131,6 +317,54 @@ class InsightsService:
             "evaluation": evaluation,
             "coverage": coverage,
         }
+
+
+def _score(key: str, label: str, value, target: float, direction: str, basis: str) -> dict:
+    """One row of the scorecard. `direction` is `min` (value must reach target) or `max`."""
+    if value is None:
+        status = "not_measured"
+    elif direction == "min":
+        status = "met" if value >= target else "below"
+    else:
+        status = "met" if value <= target else "above"
+    return {
+        "key": key,
+        "label": label,
+        "value": value,
+        "target": target,
+        "direction": direction,
+        "status": status,
+        "basis": basis,
+    }
+
+
+def _headline(scorecard: list[dict]) -> str:
+    """One sentence that states the result, for the top of the report."""
+    measured = [r for r in scorecard if r["status"] != "not_measured"]
+    if not measured:
+        return "No target could be measured yet: there are no questions in this window."
+    met = sum(1 for r in measured if r["status"] == "met")
+    verb = "was" if met == 1 else "were"
+    parts = [
+        f"{NUMBER_WORDS.get(met, met)} of {NUMBER_WORDS.get(len(measured), len(measured)).lower()} "
+        f"measured targets {verb} met."
+    ]
+    by_key = {r["key"]: r for r in scorecard}
+    if by_key["answered_rate"]["status"] == "below":
+        parts.append("Fewer questions were answered with sources than planned")
+    if by_key["ttft_ms"]["status"] == "above":
+        close = by_key["ttft_ms"]["value"] <= by_key["ttft_ms"]["target"] * 1.25
+        parts.append(
+            "first words arrived just over target"
+            if close
+            else "first words arrived well over target"
+        )
+    if by_key["citation_accuracy"]["status"] == "not_measured":
+        parts.append("citation accuracy has not yet been measured")
+    if len(parts) > 1:
+        tail = ", ".join(parts[1:-1]) + (", and " if len(parts) > 2 else "") + parts[-1] + "."
+        parts = [parts[0], tail[0].upper() + tail[1:]]
+    return " ".join(parts)
 
 
 def _median(values):

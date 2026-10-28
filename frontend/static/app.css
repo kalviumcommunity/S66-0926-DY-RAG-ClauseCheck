@@ -1,0 +1,220 @@
+/* ClauseCheck: the whole look, in one file. Tokens first; everything below uses them.
+   Rules in the spec (docs: ClauseCheck redesign spec, section 3):
+   no sidebar, no cards, no shadows except the clause page edge, radius 2px on buttons only,
+   one serif (Source Serif 4), one sans (IBM Plex Sans), one mono (IBM Plex Mono). */
+
+@font-face { font-family: "Source Serif 4"; font-weight: 400; font-display: swap;
+  src: url("/app/static/SourceSerif4-Regular.woff2") format("woff2"); }
+@font-face { font-family: "Source Serif 4"; font-weight: 600; font-display: swap;
+  src: url("/app/static/SourceSerif4-SemiBold.woff2") format("woff2"); }
+
+:root {
+  --paper: #F4F1EA;  --sheet: #FFFEFB;
+  --ink: #1A1915;    --ink-2: #55514A;  --ink-3: #6E695E;
+  --hairline: #D6D0C3;
+  --green: #1D5C47;  --highlight: #F2E0A0;
+  --amber: #8A5606;  --amber-bg: #FBF0DC;
+  --grey: #EAE7E0;
+  --red: #9B2A21;    --red-bg: #FAE8E5;
+  --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+/* ---- Streamlit chrome we do not want -------------------------------------------------------- */
+[data-testid="stHeader"], [data-testid="stToolbar"], [data-testid="stDecoration"],
+[data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"],
+[data-testid="collapsedControl"], #MainMenu, footer { display: none !important; }
+.stApp { background: var(--paper); color: var(--ink); font-family: var(--sans); }
+.block-container, [data-testid="stMainBlockContainer"] {
+  max-width: none !important; padding: 28px 48px 72px !important; }
+h1, h2, h3 { font-family: var(--serif); font-weight: 600; letter-spacing: 0; }
+a { color: var(--green); }
+
+/* ---- Masthead ------------------------------------------------------------------------------- */
+.cc-wordmark { font-family: var(--serif); font-weight: 600; font-size: 24px; line-height: 32px;
+  color: var(--ink); white-space: nowrap; }
+.cc-wordmark span { color: var(--green); margin-right: 6px; }
+.cc-index { text-align: right; font-size: 12px; line-height: 18px; color: var(--ink-2); }
+.cc-index b { color: var(--ink); font-weight: 500; }
+.cc-double-rule { border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink);
+  height: 4px; margin: 10px 0 0; }
+[data-testid="stPageLink-NavLink"] { padding: 4px 0 !important; min-height: 0 !important;
+  background: transparent !important; border-radius: 0 !important; }
+[data-testid="stPageLink-NavLink"] p { font-size: 12.5px; color: var(--green); font-weight: 400;
+  text-decoration: underline; text-underline-offset: 2px; }
+[data-testid="stHorizontalBlock"]:has(.cc-wordmark) [data-testid="stPageLink-NavLink"] p {
+  font-size: 14px; color: var(--ink-2); text-decoration: none; }
+[data-testid="stHorizontalBlock"]:has(.cc-wordmark) [data-testid="stPageLink-NavLink"]:hover p {
+  color: var(--ink); }
+.cc-tab { font-size: 14px; line-height: 21px; padding: 4px 0; display: inline-block; }
+.cc-tab--active { color: var(--ink); font-weight: 600; border-bottom: 2px solid var(--ink); }
+
+/* ---- Status line (the five numbers, as one ruled line of text) ------------------------------ */
+.cc-status { display: flex; flex-wrap: wrap; gap: 0; border-bottom: 1px solid var(--hairline);
+  font-size: 12px; line-height: 18px; color: var(--ink-2); padding: 7px 0; }
+.cc-status > div { padding: 0 14px; border-left: 1px solid var(--hairline); }
+.cc-status > div:first-child { padding-left: 0; border-left: 0; }
+.cc-status b { color: var(--ink); font-weight: 600; }
+.cc-status .cc-flag { white-space: nowrap; }
+.cc-status .cc-spacer { flex: 1; border-left: 0; }
+.cc-met { color: var(--green); }  .cc-below { color: var(--amber); }  .cc-na { color: var(--ink-3); }
+
+/* ---- Docket line, section starts ------------------------------------------------------------ */
+.cc-kicker { font-size: 12px; color: var(--ink-3); line-height: 18px; margin-top: 18px; }
+.cc-title { font-family: var(--serif); font-weight: 600; font-size: 30px; line-height: 36px;
+  margin: 0 0 4px; color: var(--ink); }
+.cc-ids { font-family: var(--mono); font-size: 12px; color: var(--ink-3); margin-left: 12px; }
+.cc-lede { font-size: 14px; line-height: 21px; color: var(--ink-2); max-width: 70ch; margin: 2px 0 14px; }
+.cc-rule { border: 0; border-top: 1px solid var(--ink); margin: 14px 0 0; }
+.cc-hair { border: 0; border-top: 1px solid var(--hairline); margin: 0; }
+
+/* ---- Register ------------------------------------------------------------------------------- */
+.cc-reg-head, .cc-reg-row { display: grid; grid-template-columns: 44px 2.4fr 1.7fr 1.2fr 1.1fr;
+  gap: 12px; align-items: center; padding: 9px 0; font-size: 13px; }
+.cc-reg-head { color: var(--ink-3); font-size: 12px; }
+.cc-reg-row { min-height: 40px; border-bottom: 1px solid var(--hairline); }
+.cc-reg-head { border-bottom: 1px solid var(--ink); }
+.cc-reg-head.cc-end { display: block; }
+/* each row is stretched to equal height, so the rule under our HTML cells and the one under the
+   Check button line up; the button's column is found by the key Streamlit gives the button */
+[data-testid="stHorizontalBlock"]:has([class*="st-key-pick-"]) { align-items: stretch !important; }
+[data-testid="stColumn"]:has([class*="st-key-pick-"]) { border-bottom: 1px solid var(--hairline);
+  display: flex; align-items: center; }
+.cc-no { font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
+.cc-reg-name { font-family: var(--serif); font-weight: 600; font-size: 16px; color: var(--ink); }
+.cc-date { font-family: var(--mono); font-size: 12px; color: var(--ink-2); }
+.cc-reg-foot { font-size: 12px; color: var(--ink-3); padding-top: 10px; }
+
+/* ---- Recent checks -------------------------------------------------------------------------- */
+.cc-side-title { font-family: var(--serif); font-weight: 600; font-size: 18px; margin-bottom: 8px; }
+.cc-recent { padding: 9px 0 10px; border-bottom: 1px solid var(--hairline); }
+.cc-recent q { display: block; quotes: none; font-family: var(--serif); font-weight: 600;
+  font-size: 15px; line-height: 21px; }
+.cc-recent q::before { content: "\201C"; } .cc-recent q::after { content: "\201D"; }
+.cc-recent small { font-size: 12px; color: var(--ink-3); }
+.cc-out-checked { color: var(--green); } .cc-out-verify { color: var(--amber); }
+.cc-out-none { color: var(--ink-3); }     .cc-out-failed { color: var(--red); }
+.cc-fine { font-size: 12px; line-height: 18px; color: var(--ink-3); margin-top: 12px; }
+
+/* ---- A check record ------------------------------------------------------------------------- */
+.cc-meta { font-size: 12px; color: var(--ink-3); margin: 18px 0 4px; }
+.cc-q { font-family: var(--serif); font-weight: 600; font-size: 22px; line-height: 30px;
+  margin: 0 0 8px; color: var(--ink); }
+.cc-answer { font-size: 15.5px; line-height: 25px; color: var(--ink); max-width: 68ch; }
+.cc-answer b { font-weight: 600; }
+.cc-cite { font-family: var(--mono); font-size: 11px; color: var(--green); margin-left: 2px;
+  text-decoration: underline; text-underline-offset: 2px; }
+.cc-h { font-size: 12px; font-weight: 600; margin: 16px 0 4px; color: var(--ink); }
+table.cc-t { width: 100%; border-collapse: collapse; font-size: 13px; line-height: 19px; }
+table.cc-t th { text-align: left; font-weight: 400; font-size: 12px; color: var(--ink-3);
+  border-bottom: 1px solid var(--ink); padding: 6px 12px 6px 0; }
+table.cc-t td { padding: 8px 12px 8px 0; border-bottom: 1px solid var(--hairline); vertical-align: top; }
+table.cc-t td.num, table.cc-t th.num { text-align: right; padding-right: 0; }
+.cc-strike { text-decoration: line-through; color: var(--ink-3); }
+.cc-tag { display: inline-block; font-size: 11.5px; line-height: 16px; padding: 1px 7px; border: 1px solid;
+  border-radius: 0; white-space: nowrap; }
+.cc-tag--in_force { color: var(--green); border-color: var(--green); }
+.cc-tag--replaced, .cc-tag--amended { color: var(--ink-2); border-color: var(--ink-3);
+  background: var(--grey); }
+
+/* ---- The seal: what the backend verified ---------------------------------------------------- */
+.cc-seal { display: flex; gap: 18px; align-items: center; border: 2px solid var(--green);
+  color: var(--green); padding: 12px 16px; margin: 16px 0 6px; background: transparent; }
+.cc-seal--verify { border-color: var(--amber); color: var(--amber); background: var(--amber-bg); }
+.cc-seal-word { font-family: var(--serif); font-weight: 600; font-size: 22px;
+  padding-right: 18px; border-right: 1px solid currentColor; }
+.cc-seal ul { list-style: none; margin: 0; padding: 0; font-size: 13px; line-height: 20px; }
+.cc-timing { font-size: 12px; color: var(--ink-3); margin: 4px 0 0; }
+
+/* ---- Other outcomes, one record each -------------------------------------------------------- */
+.cc-note { padding: 11px 14px; font-size: 13.5px; line-height: 20px; margin: 10px 0 4px; }
+.cc-note b { font-weight: 600; }
+.cc-note small { display: block; font-size: 12px; margin-top: 3px; }
+.cc-note--none { background: var(--grey); color: var(--ink); }
+.cc-note--none small { color: var(--ink-2); }
+.cc-note--verify { background: var(--amber-bg); color: var(--amber); }
+.cc-note--failed { background: var(--red-bg); color: var(--red); }
+.cc-steps { list-style: none; margin: 8px 0 0; padding: 0; font-size: 13px; line-height: 22px; }
+.cc-steps .done { color: var(--green); } .cc-steps .active { color: var(--ink); font-weight: 500; }
+.cc-steps .todo { color: var(--ink-3); } .cc-steps code { font-family: var(--mono); font-size: 12px;
+  color: var(--ink-3); margin-left: 6px; }
+
+/* ---- The clause as a page ------------------------------------------------------------------- */
+.cc-sheet { position: relative; background: var(--sheet); border: 1px solid var(--hairline);
+  padding: 22px 28px 20px 44px; margin-top: 8px;
+  box-shadow: 3px 3px 0 -1px var(--sheet), 3px 3px 0 0 var(--hairline),
+              6px 6px 0 -1px var(--sheet), 6px 6px 0 0 var(--hairline); }
+.cc-sheet-head { display: flex; justify-content: space-between; font-family: var(--mono);
+  font-size: 11px; color: var(--ink-3); margin-bottom: 8px; }
+.cc-sheet-sub { font-size: 12px; color: var(--ink-3); margin-bottom: 12px; }
+.cc-clause { font-family: var(--serif); font-size: 16px; line-height: 27px; color: var(--ink);
+  position: relative; white-space: pre-wrap; }
+.cc-clause mark { background: var(--highlight); color: var(--ink); padding: 0 1px; }
+.cc-margin { position: absolute; left: -34px; top: 0; font-family: var(--mono); font-size: 11px;
+  color: var(--green); }
+.cc-sheet-foot { font-size: 12px; color: var(--ink-3); border-top: 1px solid var(--hairline);
+  margin-top: 14px; padding-top: 8px; }
+.cc-sheet-empty { font-size: 13px; color: var(--ink-3); padding: 28px 0; }
+
+/* ---- Forms: the filing ---------------------------------------------------------------------- */
+.cc-step { display: flex; gap: 18px; align-items: baseline; margin-top: 26px; }
+.cc-step-no { font-family: var(--serif); font-size: 22px; color: var(--ink-3); width: 26px; }
+.cc-step-name { font-family: var(--serif); font-weight: 600; font-size: 18px; }
+.cc-hint { font-size: 12px; color: var(--ink-3); line-height: 18px; margin-top: 2px; }
+.cc-log-title { font-family: var(--serif); font-weight: 600; font-size: 18px; }
+.cc-log-row { display: grid; grid-template-columns: 70px 20px 1fr; gap: 6px; font-size: 13px;
+  line-height: 19px; padding: 6px 0; }
+.cc-log-row .t { font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
+.cc-log-row .ok { color: var(--green); } .cc-log-row .bad { color: var(--red); }
+.cc-log-row small { display: block; color: var(--ink-3); font-size: 12px; }
+.cc-log-row.todo { color: var(--ink-3); }
+
+/* ---- Report --------------------------------------------------------------------------------- */
+.cc-headline { font-family: var(--serif); font-size: 19px; line-height: 28px; max-width: 78ch;
+  margin: 4px 0 4px; }
+.cc-headline span { color: var(--ink-2); }
+.cc-bar { display: flex; height: 26px; margin: 8px 0 12px; }
+.cc-bar i { display: block; height: 100%; }
+.cc-key { display: grid; grid-template-columns: 14px 1fr 56px 56px; gap: 8px; font-size: 13px;
+  line-height: 24px; align-items: center; }
+.cc-key .sw { width: 10px; height: 10px; display: inline-block; }
+.cc-figure { font-size: 12px; color: var(--ink-3); margin-top: 22px; }
+.cc-fig-title { font-family: var(--serif); font-weight: 600; font-size: 17px; margin-bottom: 8px; }
+.cc-topic { display: grid; grid-template-columns: 170px 1fr 40px; gap: 10px; align-items: center;
+  font-size: 13px; line-height: 24px; }
+.cc-topic .bar { height: 14px; background: var(--ink); }
+.cc-topic .bar.hatched { background: repeating-linear-gradient(135deg, var(--ink-3) 0 1px,
+  transparent 1px 5px); border: 1px solid var(--ink-3); }
+.cc-topic .n { text-align: right; font-family: var(--mono); font-size: 12px; }
+.cc-meter { position: relative; width: 120px; height: 8px; background: var(--grey); }
+.cc-meter i { position: absolute; left: 0; top: 0; height: 100%; }
+.cc-meter b { position: absolute; top: -3px; width: 2px; height: 14px; background: var(--ink); }
+.cc-footnotes { font-size: 12px; line-height: 18px; color: var(--ink-3); margin-top: 20px;
+  border-top: 1px solid var(--hairline); padding-top: 8px; }
+
+/* ---- Streamlit widgets, restyled through a few rules (the rest is the theme) ---------------- */
+div[data-baseweb="input"], div[data-baseweb="base-input"], div[data-baseweb="select"] > div {
+  background: transparent !important; border: 0 !important; border-bottom: 1px solid var(--ink) !important;
+  border-radius: 0 !important; }
+div[data-baseweb="input"] input { padding-left: 0 !important; font-size: 14px; }
+[data-testid="stWidgetLabel"] p { font-size: 12px; color: var(--ink-3); }
+.stButton > button, .stFormSubmitButton > button, .stDownloadButton > button {
+  border-radius: 2px; font-size: 13px; padding: 5px 14px; min-height: 0; box-shadow: none; }
+.stButton > button[kind="secondary"], .stDownloadButton > button[kind="secondary"],
+.stFormSubmitButton > button[kind="secondary"], [data-testid="stPopover"] > button {
+  background: transparent; color: var(--ink); border: 1px solid var(--ink); border-radius: 2px;
+  font-size: 13px; padding: 5px 14px; min-height: 0; }
+.stButton > button[kind="tertiary"], .stDownloadButton > button[kind="tertiary"] { color: var(--green); text-decoration: underline;
+  padding: 0 2px; border: 0; background: transparent; font-size: 12.5px; text-underline-offset: 2px; }
+.stButton > button[kind="primary"], .stFormSubmitButton > button[kind="primary"] {
+  background: var(--green); color: #fff; border: 1px solid var(--green); }
+[data-testid="stFileUploaderDropzone"] { background: var(--sheet); border: 1px dashed var(--hairline);
+  border-radius: 0; }
+[data-testid="stSegmentedControl"] button { border-radius: 0 !important; font-family: var(--mono);
+  font-size: 12px; }
+@media (max-width: 1100px) { .block-container, [data-testid="stMainBlockContainer"] {
+  padding: 20px 24px 56px !important; } }
+
+/* Streamlit's own hint inside the text box repeats what the Check button already says */
+[data-testid="InputInstructions"] { display: none; }

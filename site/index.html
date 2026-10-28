@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClauseCheck: check a contract term before you act on it</title>
+<meta name="description" content="Ask a plain-English question about one supplier contract and its amendments. Every answer quotes the clause it comes from, and every quote and number is checked against the document.">
+<meta property="og:title" content="ClauseCheck: check a contract term before you act on it">
+<meta property="og:description" content="Answers that quote the clause, with the citations and numbers checked against the contract.">
+<meta property="og:image" content="og-image.png">
+<meta property="og:type" content="website">
+<link rel="icon" type="image/png" href="favicon.png">
+<style>
+@font-face { font-family: "Source Serif 4"; font-weight: 400; font-display: swap; src: url("SourceSerif4-Regular.woff2") format("woff2"); }
+@font-face { font-family: "Source Serif 4"; font-weight: 600; font-display: swap; src: url("SourceSerif4-SemiBold.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Sans"; font-weight: 400; font-display: swap; src: url("IBMPlexSans-Regular.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Sans"; font-weight: 500; font-display: swap; src: url("IBMPlexSans-Medium.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Sans"; font-weight: 600; font-display: swap; src: url("IBMPlexSans-SemiBold.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Mono"; font-weight: 400; font-display: swap; src: url("IBMPlexMono-Regular.woff2") format("woff2"); }
+
+:root {
+  --paper: #F4F1EA; --sheet: #FFFEFB; --ink: #1A1915; --ink-2: #55514A; --ink-3: #6E695E;
+  --hairline: #D6D0C3; --green: #1D5C47; --amber: #8A5606; --red: #9B2A21;
+  --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 400 16px/26px var(--sans); }
+a { color: var(--green); text-underline-offset: 3px; }
+a:focus-visible, .button:focus-visible { outline: 2px solid var(--green); outline-offset: 3px; }
+.wrap { max-width: 1200px; margin: 0 auto; padding: 0 48px; }
+header { padding: 28px 0 0; }
+.mast { display: flex; justify-content: space-between; align-items: baseline; }
+.wordmark { font: 600 24px/32px var(--serif); }
+.wordmark span { color: var(--green); margin-right: 6px; }
+.rule { border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink); height: 4px; margin-top: 10px; }
+.hair { border: 0; border-top: 1px solid var(--hairline); margin: 0; }
+
+.hero { display: grid; grid-template-columns: 5fr 7fr; gap: 56px; padding: 64px 0 72px; align-items: start; }
+.kicker { font-size: 13px; color: var(--ink-2); margin: 0 0 10px; }
+h1 { font: 600 46px/54px var(--serif); margin: 0 0 20px; }
+.lede { color: var(--ink-2); max-width: 46ch; margin: 0 0 28px; }
+.actions { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
+.button { display: inline-block; background: var(--green); color: #fff; text-decoration: none;
+  font-weight: 500; padding: 11px 20px; border-radius: 2px; }
+.button:hover { background: #164a39; }
+.shot { margin: 0; }
+.shot img { width: 100%; height: auto; display: block; border: 1px solid var(--hairline);
+  box-shadow: 3px 3px 0 var(--sheet), 3px 3px 0 1px var(--hairline); }
+.shot figcaption { font-size: 12px; color: var(--ink-3); margin-top: 10px; }
+
+section { padding: 56px 0; border-top: 1px solid var(--hairline); }
+h2 { font: 600 28px/36px var(--serif); margin: 0 0 8px; }
+.sub { color: var(--ink-2); margin: 0 0 28px; max-width: 62ch; }
+ol.steps { list-style: none; margin: 0; padding: 0; counter-reset: s; max-width: 860px; }
+ol.steps li { counter-increment: s; display: grid; grid-template-columns: 44px 1fr; gap: 0 12px;
+  padding: 16px 0; border-top: 1px solid var(--hairline); }
+ol.steps li:last-child { border-bottom: 1px solid var(--hairline); }
+ol.steps li::before { content: counter(s, decimal-leading-zero); font: 400 13px/26px var(--mono); color: var(--ink-3); }
+ol.steps b { font-weight: 600; }
+ol.steps code { display: block; font: 400 13px/20px var(--mono); color: var(--ink-2); margin-top: 4px; }
+
+ul.limits { margin: 0; padding: 0; list-style: none; max-width: 760px; }
+ul.limits li { padding: 12px 0; border-top: 1px solid var(--hairline); }
+ul.limits li:last-child { border-bottom: 1px solid var(--hairline); }
+ul.limits b { font-weight: 600; }
+
+table { width: 100%; max-width: 860px; border-collapse: collapse; font-size: 14px; line-height: 20px; }
+th { text-align: left; font-weight: 400; font-size: 12px; color: var(--ink-3); border-bottom: 1px solid var(--ink); padding: 6px 12px 6px 0; }
+td { padding: 10px 12px 10px 0; border-bottom: 1px solid var(--hairline); vertical-align: top; }
+.num { font-family: var(--mono); font-size: 13px; }
+.met { color: var(--green); } .below { color: var(--amber); } .none { color: var(--ink-3); }
+.asof { font-size: 13px; color: var(--ink-3); margin-top: 12px; }
+.fine { font-size: 14px; color: var(--ink-2); max-width: 62ch; }
+footer { padding: 28px 0 56px; border-top: 1px solid var(--hairline); font-size: 13px; color: var(--ink-3); }
+
+@media (max-width: 860px) {
+  .wrap { padding: 0 16px; }
+  .hero { grid-template-columns: 1fr; gap: 32px; padding: 40px 0 48px; }
+  h1 { font-size: 34px; line-height: 42px; }
+  .mast { flex-direction: column; gap: 0; }
+}
+</style>
+</head>
+<body>
+<header class="wrap">
+  <div class="mast"><div class="wordmark"><span>§</span>ClauseCheck</div></div>
+  <div class="rule"></div>
+</header>
+
+<main class="wrap">
+  <div class="hero">
+    <div>
+      <p class="kicker">For procurement and contract teams</p>
+      <h1>Check a contract term before you act on it.</h1>
+      <p class="lede">Ask a question about one supplier contract and its amendments. The answer quotes the clause it comes from, and ClauseCheck confirms each citation and number against the document before you see it.</p>
+      <div class="actions">
+        <a class="button" id="open" href="http://localhost:8501">Open ClauseCheck</a>
+        <a href="#how">See how an answer is checked</a>
+      </div>
+    </div>
+    <figure class="shot">
+      <img src="check-record.png" width="1440" height="900" alt="ClauseCheck showing the question “What are the payment terms?” for the Orion contract: an answer quoting forty-five days, a terms table, a green Checked seal, and the amending clause with its words highlighted.">
+      <figcaption>A real check, from the running app: the answer, the terms found, the seal, and the clause the answer relies on.</figcaption>
+    </figure>
+  </div>
+
+  <section id="how">
+    <h2>How an answer is checked</h2>
+    <p class="sub">Each check runs against one contract and its amendments only. These are the steps, and what you will see at each.</p>
+    <ol class="steps">
+      <li><div><b>Find the clauses.</b> The question is matched to clauses in that contract and its amendments, and the current version of each term is chosen.<code>Found 2 clauses in 2 Orion documents · 0.4 s</code></div></li>
+      <li><div><b>Write from those clauses only.</b> The answer may use nothing else, and says so when the contracts do not contain the term.<code>Writing the answer from those clauses only</code></div></li>
+      <li><div><b>Check every citation and number.</b> The program, not the model, looks for each cited clause and each figure in the document text.<code>2 of 2 citations found in the documents<br>3 of 3 numbers match the clause text</code></div></li>
+      <li><div><b>Show the clause.</b> The cited page is shown with the exact words the answer relies on highlighted, so you can read the source.<code>Checked · or · Verify, naming the number that was not found</code></div></li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>What it will not do</h2>
+    <p class="sub">The limits, stated up front.</p>
+    <ul class="limits">
+      <li><b>No questions across contracts.</b> A check covers one contract. A question that names another contract is refused, not answered from the wrong one.</li>
+      <li><b>No guessing.</b> If the contract has no such term, the answer is “No term found”, and nothing is invented to fill the gap.</li>
+      <li><b>No estimating redacted values.</b> A figure hidden in a filing stays hidden.</li>
+      <li><b>No legal advice.</b> Answers quote contracts. They do not say what you should do.</li>
+    </ul>
+  </section>
+
+  <section id="results">
+    <h2>Results so far</h2>
+    <p class="sub" id="headline">Loading the latest figures.</p>
+    <table id="scorecard" hidden>
+      <thead><tr><th>Measure</th><th>Result</th><th>Target</th><th>Status</th><th>Basis</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <p class="asof" id="asof"></p>
+    <noscript><p class="fine">The figures load from results.json, which needs JavaScript.</p></noscript>
+  </section>
+
+  <section>
+    <h2>What’s indexed</h2>
+    <p class="sub" id="indexed">The index holds public contracts and generated examples.</p>
+    <table style="max-width:760px">
+      <thead><tr><th>Source</th><th>How it is labelled</th></tr></thead>
+      <tbody>
+        <tr><td>CUAD v1 contracts</td><td>Distributor, supply and service agreements from SEC filings, labelled with the contract name.</td></tr>
+        <tr><td>SEC EDGAR amendments</td><td>Each amendment is linked to the agreement it changes, with its effective date.</td></tr>
+        <tr><td>Vendor documents</td><td>Public data processing terms and service levels, labelled with the vendor.</td></tr>
+        <tr><td>Synthetic examples</td><td>Price schedules and certificates generated for testing. They are not real agreements.</td></tr>
+      </tbody>
+    </table>
+    <p class="fine" style="margin-top:16px">The indexed documents are public filings or generated examples. A document you file yourself is stored in your own deployment of ClauseCheck.</p>
+  </section>
+</main>
+
+<footer><div class="wrap">ClauseCheck · Contract data from the Contract Understanding Atticus Dataset (CC BY 4.0). Answers quote contracts and are not legal advice.</div></footer>
+
+<script>
+(function () {
+  var pct = function (v) { return Math.round(v * 100) + "%"; };
+  var secs = function (ms) { return (ms / 1000).toFixed(1) + " s"; };
+  var fmt = { answered_rate: pct, citation_accuracy: pct, ttft_ms: secs, checked_ms: secs };
+  var words = { met: "Met", below: "Not met", above: "Not met", not_measured: "Not measured" };
+  var day = function (iso) { return iso ? iso.slice(0, 10) : ""; };
+  fetch("results.json", { cache: "no-store" }).then(function (r) {
+    if (!r.ok) throw new Error(r.status);
+    return r.json();
+  }).then(function (d) {
+    document.getElementById("headline").textContent = d.headline;
+    var body = document.querySelector("#scorecard tbody");
+    d.scorecard.forEach(function (row) {
+      var f = fmt[row.key] || String;
+      var tr = document.createElement("tr");
+      var cells = [
+        row.label,
+        row.value == null ? "Not measured" : f(row.value),
+        (row.direction === "min" ? "at least " : "at most ") + f(row.target),
+        words[row.status] || row.status,
+        row.basis
+      ];
+      cells.forEach(function (text, i) {
+        var td = document.createElement("td");
+        td.textContent = text;
+        if (i === 1) td.className = "num";
+        if (i === 3) td.className = row.status === "met" ? "met" : row.status === "not_measured" ? "none" : "below";
+        tr.appendChild(td);
+      });
+      body.appendChild(tr);
+    });
+    document.getElementById("scorecard").hidden = false;
+    document.getElementById("asof").textContent =
+      d.window + ", " + d.questions + " logged questions, as of " + day(d.generated_at) + ".";
+    document.getElementById("indexed").textContent =
+      "The index holds " + d.index.documents + " documents in " + d.index.contracts + " contracts.";
+  }).catch(function () {
+    document.getElementById("headline").textContent =
+      "The latest figures could not be loaded. None are shown rather than out-of-date ones.";
+  });
+})();
+</script>
+</body>
+</html>
