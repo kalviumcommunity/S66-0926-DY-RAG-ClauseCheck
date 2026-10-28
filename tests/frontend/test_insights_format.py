@@ -10,5 +10,10 @@ def test_format_kpi():
 
 
 def test_five_kpi_cards():
-    assert list(KPI_LABELS) == ["questions_asked", "answer_rate", "median_time_to_checked_answer_ms",
-                                "median_ttft_ms", "citation_accuracy"]
+    assert list(KPI_LABELS) == [
+        "questions_asked",
+        "answer_rate",
+        "median_time_to_checked_answer_ms",
+        "median_ttft_ms",
+        "citation_accuracy",
+    ]

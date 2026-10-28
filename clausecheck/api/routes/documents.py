@@ -1,3 +1,5 @@
+import re
+
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 
@@ -43,6 +45,8 @@ async def upload_document(
     supplier_id: str = Form(...),
     doc_type: str = Form("contract"),
     display_name: str = Form(""),
+    effective_date: str = Form(""),
+    amends: str = Form(""),
     container=Depends(get_container),
 ):
     settings = container.settings
@@ -50,6 +54,11 @@ async def upload_document(
     if not supplier_id:
         # without a supplier the document cannot be searched on its own and is easily outranked
         return JSONResponse(status_code=422, content={"detail": "supplier_id is required"})
+    effective_date = effective_date.strip()
+    if effective_date and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", effective_date):
+        return JSONResponse(
+            status_code=422, content={"detail": "effective_date must be written YYYY-MM-DD"}
+        )
     content = await file.read()
     max_bytes = settings.max_upload_mb * 1024 * 1024
     if len(content) > max_bytes:
@@ -64,6 +73,10 @@ async def upload_document(
     try:
         # only sent when given, so a service without display_name support keeps working
         extra = {"display_name": display_name.strip()} if display_name.strip() else {}
+        if effective_date:
+            extra["effective_date"] = effective_date
+        if amends.strip():
+            extra["amends"] = amends.strip()
         job_id = service.submit(file.filename or "upload", content, supplier_id, doc_type, **extra)
     except DuplicateDocumentError as exc:
         return JSONResponse(status_code=409, content={"detail": "duplicate", "doc_id": exc.doc_id})

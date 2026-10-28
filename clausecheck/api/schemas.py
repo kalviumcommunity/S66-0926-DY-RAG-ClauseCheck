@@ -18,6 +18,8 @@ class ChatRequest(BaseModel):
     supplier_id: str | None = None
     # True: the conversation is about this one contract; a question naming another is refused
     strict_scope: bool = False
+    # True: the stream also carries `step` events and a `checks` event (the new app uses them)
+    detail: bool = False
 
 
 class ChatResponse(BaseModel):

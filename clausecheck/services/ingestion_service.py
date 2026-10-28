@@ -63,8 +63,13 @@ def ingest_document(
     settings=None,
     embedder=None,
     vector_store=None,
+    progress=None,
 ) -> IngestResult:
-    """Ingest one manifest row. Failures are returned, not raised."""
+    """Ingest one manifest row. Failures are returned, not raised.
+
+    `progress(step, detail)` is called as the document moves through the pipeline, so an upload
+    can show real counts: `extracted` (pages), `split` (clauses), `embedding`, `ready`.
+    """
     doc_id = row["doc_id"]
     try:
         path = Path(root) / row["path"]
@@ -77,8 +82,13 @@ def ingest_document(
         if "fallback_text" not in load_row and (fallback := _fallback_text(path, row)):
             load_row["fallback_text"] = fallback
         doc = clean(load(path, load_row))
+        if progress:
+            texts = sum(1 for page in doc.pages if page.text.strip())
+            progress("extracted", {"pages": len(doc.pages), "text_pages": texts})
         max_tokens, window, overlap = _chunk_params(settings)
         chunks = chunk(doc, max_tokens, window, overlap)
+        if progress:
+            progress("split", {"clauses": len(chunks)})
         if dry_run:
             return IngestResult(doc_id, "dry-run", len(chunks))
 
@@ -91,7 +101,11 @@ def ingest_document(
             n_chunks=len(chunks),
             ingested_at=dt.datetime.now(dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         )
+        if progress:
+            progress("embedding", {"clauses": len(chunks)})
         index(conn, doc_row, chunks, embedder=embedder, vector_store=vector_store)
+        if progress:
+            progress("ready", {"clauses": len(chunks)})
         return IngestResult(doc_id, "ingested", len(chunks))
     except Exception as exc:
         error = f"{type(exc).__name__}: {exc}"
@@ -209,6 +223,8 @@ class UploadService:
         supplier_id: str,
         doc_type: str = "contract",
         display_name: str | None = None,
+        effective_date: str | None = None,
+        amends: str | None = None,
     ) -> str:
         sha = self._sha256(content)
         # duplicate check
@@ -237,17 +253,59 @@ class UploadService:
                 (job_id, "upload", "queued", filename, _now(), _now()),
             )
             conn.commit()
+            self._record_step(
+                conn,
+                job_id,
+                "checked",
+                {"bytes": len(content), "type": Path(filename).suffix.lstrip(".").upper()},
+            )
         finally:
             conn.close()
 
         dest.write_bytes(content)
 
         self.executor.submit(
-            self._run, job_id, filename, content, supplier_id, doc_type, sha, dest, display_name
+            self._run,
+            job_id,
+            filename,
+            content,
+            supplier_id,
+            doc_type,
+            sha,
+            dest,
+            display_name,
+            effective_date,
+            amends,
         )
         return job_id
 
-    def _run(self, job_id, filename, content, supplier_id, doc_type, sha, dest, display_name=None):
+    @staticmethod
+    def _record_step(conn, job_id: str, step: str, detail: dict | None = None) -> None:
+        """Append one line to the job's filing log (what happened, when, with which counts)."""
+        import json
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS job_steps " "(job_id TEXT, at TEXT, step TEXT, detail TEXT)"
+        )
+        conn.execute(
+            "INSERT INTO job_steps (job_id, at, step, detail) VALUES (?, ?, ?, ?)",
+            (job_id, _now(), step, json.dumps(detail or {})),
+        )
+        conn.commit()
+
+    def _run(
+        self,
+        job_id,
+        filename,
+        content,
+        supplier_id,
+        doc_type,
+        sha,
+        dest,
+        display_name=None,
+        effective_date=None,
+        amends=None,
+    ):
         from pathlib import Path
 
         from clausecheck.core import ids
@@ -305,6 +363,12 @@ class UploadService:
                 row = amendments.describe(conn, row, head)
             except Exception:
                 pass
+            # what the user typed wins over what was read from the document
+            if effective_date:
+                row["effective_date"] = effective_date
+            if amends:
+                row["parent_doc_id"] = amends
+                row["doc_type"] = "amendment"
 
             from clausecheck.services.ingestion_service import ingest_document
 
@@ -316,6 +380,7 @@ class UploadService:
                 settings=settings,
                 embedder=self.embedder,
                 vector_store=self.vector_store,
+                progress=lambda step, detail: self._record_step(conn, job_id, step, detail),
             )
             if result.status == "failed":
                 raise RuntimeError(result.error or "ingest failed")
@@ -337,10 +402,27 @@ class UploadService:
                     ("failed", f"{type(exc).__name__}: {exc}", _now(), job_id),
                 )
                 conn.commit()
+                self._record_step(conn, job_id, "failed", {"error": type(exc).__name__})
             except Exception:
                 pass
         finally:
             conn.close()
+
+    @staticmethod
+    def _steps(conn, job_id: str) -> list[dict]:
+        """The filing log as lines of `{"at", "id", "label", "detail"}`."""
+        import json
+
+        try:
+            rows = conn.execute(
+                "SELECT at, step, detail FROM job_steps WHERE job_id=? ORDER BY rowid", (job_id,)
+            ).fetchall()
+        except Exception:  # no step has been recorded yet, so the table may not exist
+            return []
+        return [
+            {"at": r["at"], "id": r["step"], **describe_step(r["step"], json.loads(r["detail"]))}
+            for r in rows
+        ]
 
     def get_job(self, job_id: str):
         conn = self.conn_factory()
@@ -355,9 +437,32 @@ class UploadService:
                 "status": row["status"],
                 "doc_id": row["doc_id"],
                 "error": row["error"],
+                "steps": self._steps(conn, job_id),
             }
         finally:
             conn.close()
+
+
+def describe_step(step: str, detail: dict) -> dict:
+    """The label and detail line for one step of the filing log."""
+    n = detail.get("clauses", 0)
+    if step == "checked":
+        size = f"{detail.get('bytes', 0) / (1024 * 1024):.1f} MB {detail.get('type') or ''}".strip()
+        return {"label": "File checked", "detail": f"{size} · not a duplicate"}
+    if step == "extracted":
+        pages, text = detail.get("pages", 0), detail.get("text_pages", 0)
+        word = "page" if pages == 1 else "pages"
+        suffix = "all with a text layer" if text == pages else f"{text} with a text layer"
+        return {"label": "Text extracted", "detail": f"{pages} {word}, {suffix}"}
+    if step == "split":
+        return {"label": "Split into clauses", "detail": f"{n} clauses"}
+    if step == "embedding":
+        return {"label": "Embedding clauses", "detail": f"{n} clauses"}
+    if step == "ready":
+        return {"label": "Ready to check", "detail": f"{n} clauses indexed"}
+    if step == "failed":
+        return {"label": "Could not be filed", "detail": detail.get("error", "")}
+    return {"label": step, "detail": ""}
 
 
 def _now() -> str:

@@ -2,11 +2,14 @@ from components.chat import REFUSAL_COPY, StreamCollector
 
 
 def _events(outcome="answered", reason=None):
-    return [("meta", {"query_id": "q-1", "supplier_id": "S-ACME"}),
-            ("sources", {"sources": [{"marker": "C1", "chunk_id": "c1"}]}),
-            ("token", {"text": "Net "}), ("token", {"text": "45 [C1]."}),
-            ("citations", {"citations": [{"marker": "C1", "chunk_id": "c1"}], "unsupported": False}),
-            ("done", {"outcome": outcome, "refusal_reason": reason, "timings": {}})]
+    return [
+        ("meta", {"query_id": "q-1", "supplier_id": "S-ACME"}),
+        ("sources", {"sources": [{"marker": "C1", "chunk_id": "c1"}]}),
+        ("token", {"text": "Net "}),
+        ("token", {"text": "45 [C1]."}),
+        ("citations", {"citations": [{"marker": "C1", "chunk_id": "c1"}], "unsupported": False}),
+        ("done", {"outcome": outcome, "refusal_reason": reason, "timings": {}}),
+    ]
 
 
 def test_collector_yields_only_tokens_and_builds_message():

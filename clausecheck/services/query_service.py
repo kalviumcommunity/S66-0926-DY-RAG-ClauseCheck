@@ -5,11 +5,14 @@ from dataclasses import dataclass
 from typing import Any
 
 from clausecheck.llm.client import LLMError
+from clausecheck.rag.checks import check_answer, clause_pages, terms_found
 from clausecheck.rag.citation_validator import validate
 from clausecheck.rag.context_builder import build_context
 from clausecheck.rag.generator import REFUSAL_TEXT
+from clausecheck.rag.hybrid_retriever import CLAUSE_REF_RE
 from clausecheck.rag.relevance_gate import check as gate_check
 from clausecheck.services.sessions import SessionStore
+from clausecheck.store import sqlite as db
 from clausecheck.store.cache import AnswerCache, make_key
 from clausecheck.store.query_log import QueryLog
 
@@ -59,9 +62,32 @@ class QueryService:
     index_version: str
     candidates: int = 20
     top_n: int = 5
+    conn: Any = None  # for document titles and amendment links in the checks
 
     def _new_id(self) -> str:
         return uuid.uuid4().hex
+
+    def _doc_info(self, doc_id: str) -> dict | None:
+        if self.conn is None or not doc_id:
+            return None
+        doc = db.get_document(self.conn, doc_id)
+        return dict(doc) if doc else None
+
+    def _amended_clauses(self, doc_id: str) -> dict[str, str]:
+        """`{clause number: amendment title}` for the clauses that amendments of `doc_id` name."""
+        if self.conn is None:
+            return {}
+        out: dict[str, str] = {}
+        children = self.conn.execute(
+            "SELECT doc_id, title FROM documents WHERE parent_doc_id=?", (doc_id,)
+        ).fetchall()
+        for child in children:
+            for row in self.conn.execute(
+                "SELECT text FROM chunks WHERE doc_id=?", (child["doc_id"],)
+            ).fetchall():
+                for ref in set(CLAUSE_REF_RE.findall(row["text"] or "")):
+                    out.setdefault(ref, child["title"] or child["doc_id"])
+        return out
 
     def _to_cache(self, result: QueryResult) -> dict:
         return {
@@ -121,7 +147,13 @@ class QueryService:
         )
 
     def _log(
-        self, result: QueryResult, cached: bool, chunk_ids: list[str], scores: list, sources: list
+        self,
+        result: QueryResult,
+        cached: bool,
+        chunk_ids: list[str],
+        scores: list,
+        sources: list,
+        error: str | None = None,
     ) -> None:
         import datetime
 
@@ -147,7 +179,8 @@ class QueryService:
             "error": None,
         }
         if result.outcome == "error":
-            record["error"] = result.answer
+            # the cause (`groq: RateLimitError 429; gemini: ClientError 404`), else the generic text
+            record["error"] = error or result.answer
         self.query_log.log(record)
 
     def _other_contract_reply(self, scope_id: str, rewritten: str) -> str | None:
@@ -256,6 +289,7 @@ class QueryService:
         outcome = "refused"
         refusal_reason = gate.reason
         generate_ms = 0.0
+        error_reason: str | None = None
 
         if gate.passed:
             ctx = build_context(hits, self.context_budget)
@@ -279,7 +313,8 @@ class QueryService:
                 else:
                     outcome = "answered"
                     refusal_reason = None
-            except LLMError:
+            except LLMError as exc:
+                error_reason = "; ".join(exc.reasons) or None
                 generate_ms = (time.perf_counter() - t_gen) * 1000
                 outcome = "error"
                 answer = GENERIC_ERROR
@@ -325,7 +360,7 @@ class QueryService:
             cache_payload = self._to_cache(result)
             self.cache.set(key, cache_payload)
 
-        self._log(result, False, chunk_ids, scores, [])
+        self._log(result, False, chunk_ids, scores, [], error=error_reason)
         if outcome in ("answered", "refused"):
             self.sessions.append(session_id if session_id else query_id, question, answer, supplier)
 
@@ -337,7 +372,11 @@ class QueryService:
         session_id: str | None = None,
         supplier_filter: str | None = None,
         strict_scope: bool = False,
+        detail: bool = False,
     ) -> Iterator[StreamEvent]:
+        """Stream the answer as events. With `detail`, also stream `step` events (what the
+        pipeline is doing) and a `checks` event (what was verified); the plain order is unchanged.
+        """
         query_id = self._new_id()
         t0 = time.perf_counter()
         session = self.sessions.get_or_create(session_id)
@@ -378,11 +417,31 @@ class QueryService:
 
         key = make_key(rewritten, supplier, self.index_version, self.generator.prompt.version)
         cached_val = self.cache.get(key)
+        if (
+            cached_val is not None
+            and detail
+            and cached_val.get("outcome", "answered") == "answered"
+            and "checks" not in cached_val
+        ):
+            cached_val = None  # cached by a client that did not ask for checks: answer it again
         if cached_val is not None:
             yield StreamEvent(
                 "meta",
                 {"query_id": query_id, "supplier_id": supplier, "rewritten_question": rewritten},
             )
+            if detail:
+                cached_sources = cached_val.get("sources", [])
+                yield StreamEvent(
+                    "step",
+                    {
+                        "id": "found",
+                        "state": "done",
+                        "clauses": len(cached_sources),
+                        "documents": len({c.get("doc_id") for c in cached_sources}),
+                        "ms": 0.0,
+                        "cached": True,
+                    },
+                )
             yield StreamEvent("sources", {"sources": cached_val.get("sources", [])})
             yield StreamEvent("token", {"text": cached_val.get("answer", "")})
             from clausecheck.rag.citation_validator import Citation
@@ -398,6 +457,8 @@ class QueryService:
                 )
                 for c in cached_val.get("citations", [])
             ]
+            if detail and cached_val.get("checks"):
+                yield StreamEvent("checks", cached_val["checks"])
             yield StreamEvent(
                 "citations",
                 {
@@ -448,6 +509,17 @@ class QueryService:
         yield StreamEvent(
             "meta", {"query_id": query_id, "supplier_id": supplier, "rewritten_question": rewritten}
         )
+        if detail:
+            yield StreamEvent(
+                "step",
+                {
+                    "id": "found",
+                    "state": "done",
+                    "clauses": len(hits),
+                    "documents": len({(h.metadata or {}).get("doc_id") for h in hits}),
+                    "ms": round(retrieve_ms + rerank_ms, 1),
+                },
+            )
 
         if not gate.passed:
             yield StreamEvent("sources", {"sources": []})
@@ -504,6 +576,8 @@ class QueryService:
             for m, h in ctx.marker_map.items()
         ]
         yield StreamEvent("sources", {"sources": sources})
+        if detail:
+            yield StreamEvent("step", {"id": "write", "state": "active"})
 
         t_gen = time.perf_counter()
         accumulated = ""
@@ -515,7 +589,7 @@ class QueryService:
                 accumulated += tok
                 yield StreamEvent("token", {"text": tok})
             generate_ms = (time.perf_counter() - t_gen) * 1000
-        except LLMError:
+        except LLMError as exc:
             generate_ms = (time.perf_counter() - t_gen) * 1000
             yield StreamEvent("error", {"message": GENERIC_ERROR})
             total_ms = round((time.perf_counter() - t0) * 1000, 2)
@@ -549,9 +623,11 @@ class QueryService:
                 index_version=self.index_version,
                 chunk_ids=[h.chunk_id for h in ctx.used],
             )
-            self._log(result, False, result.chunk_ids, [], [])
+            self._log(result, False, result.chunk_ids, [], [], error="; ".join(exc.reasons) or None)
             return
 
+        if detail:
+            yield StreamEvent("step", {"id": "write", "state": "done", "ms": round(generate_ms, 1)})
         vr = validate(accumulated, ctx.marker_map)
         answer = vr.answer
         citations = vr.citations
@@ -579,6 +655,19 @@ class QueryService:
             "ttft": round(ttft, 2),
         }
 
+        checks_payload = None
+        if detail and outcome == "answered":
+            yield StreamEvent("step", {"id": "check", "state": "active"})
+            checks = check_answer(answer, ctx.marker_map, self._doc_info, dropped=len(vr.dropped))
+            cited = [(c.marker, ctx.marker_map[c.marker]) for c in citations]
+            checks_payload = {
+                **checks.to_dict(),
+                "answer": answer,  # the validated text, with citation markers normalised
+                "terms": terms_found(cited, self._doc_info, self._amended_clauses),
+                "clauses": clause_pages(cited, checks, self._doc_info),
+            }
+            yield StreamEvent("checks", checks_payload)
+            yield StreamEvent("step", {"id": "check", "state": "done"})
         yield StreamEvent(
             "citations", {"citations": [c.chunk_id for c in citations], "unsupported": unsupported}
         )
@@ -609,7 +698,10 @@ class QueryService:
             chunk_ids=[h.chunk_id for h in ctx.used],
         )
         if outcome in ("answered", "refused"):
-            self.cache.set(key, self._to_cache(result))
+            payload = self._to_cache(result)
+            if checks_payload is not None:
+                payload["checks"] = checks_payload  # so a cached answer can show its seal too
+            self.cache.set(key, payload)
         self._log(
             result,
             False,
@@ -653,4 +745,5 @@ class QueryService:
             index_version=settings.index_version,
             candidates=settings.rerank_candidates,
             top_n=settings.rerank_top_n,
+            conn=conn,
         )

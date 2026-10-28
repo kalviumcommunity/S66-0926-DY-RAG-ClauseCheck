@@ -1,0 +1,45 @@
+# Streamlit reads this file from the folder it is started in, so start the app from the
+# repository root: `streamlit run frontend/app.py`.
+
+[client]
+toolbarMode = "minimal"          # no Deploy button or developer menu
+
+[server]
+headless = true
+port = 8501
+maxUploadSize = 20               # MB; the same limit as MAX_UPLOAD_MB on the backend
+enableStaticServing = true       # serves frontend/static (fonts, favicon, stylesheet)
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+base = "light"
+primaryColor = "#1D5C47"
+backgroundColor = "#F4F1EA"
+secondaryBackgroundColor = "#FFFEFB"
+textColor = "#1A1915"
+borderColor = "#D6D0C3"
+baseRadius = "2px"
+font = "IBM Plex Sans"
+codeFont = "IBM Plex Mono"
+
+[[theme.fontFaces]]
+family = "IBM Plex Sans"
+url = "app/static/IBMPlexSans-Regular.woff2"
+weight = 400
+
+[[theme.fontFaces]]
+family = "IBM Plex Sans"
+url = "app/static/IBMPlexSans-Medium.woff2"
+weight = 500
+
+[[theme.fontFaces]]
+family = "IBM Plex Sans"
+url = "app/static/IBMPlexSans-SemiBold.woff2"
+weight = 600
+
+[[theme.fontFaces]]
+family = "IBM Plex Mono"
+url = "app/static/IBMPlexMono-Regular.woff2"
+weight = 400

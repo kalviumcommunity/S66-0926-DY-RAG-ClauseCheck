@@ -19,8 +19,12 @@ def _check_scope(container, req: ChatRequest) -> None:
 
 
 def _scope_kwargs(req: ChatRequest) -> dict:
-    """`strict_scope` is only passed when set, so a query service without it keeps working."""
+    """Options are only passed when set, so a query service without them keeps working."""
     return {"strict_scope": True} if req.strict_scope else {}
+
+
+def _stream_kwargs(req: ChatRequest) -> dict:
+    return {**_scope_kwargs(req), **({"detail": True} if req.detail else {})}
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -66,7 +70,7 @@ def chat_stream(req: ChatRequest, container=Depends(get_container)):
                 req.question,
                 session_id=req.session_id,
                 supplier_filter=req.supplier_id,
-                **_scope_kwargs(req),
+                **_stream_kwargs(req),
             ):
                 yield f"event: {ev.type}\ndata: {json.dumps(ev.data)}\n\n"
         except Exception:
