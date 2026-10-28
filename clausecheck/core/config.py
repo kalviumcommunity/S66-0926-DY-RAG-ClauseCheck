@@ -16,9 +16,13 @@ class Settings(BaseSettings):
     # LLM providers
     gemini_api_key: SecretStr
     groq_api_key: SecretStr
-    gemini_model: str = "gemini-2.0-flash"
-    groq_model: str = "llama-3.3-70b-versatile"
-    judge_model: str = "llama-3.3-70b-versatile"
+    gemini_model: str = "gemini-3.1-flash-lite"
+    groq_model: str = "openai/gpt-oss-120b"
+    judge_model: str = "openai/gpt-oss-120b"
+
+    # Which provider answers first; the other is the fallback. gemini-3.1-flash-lite wrongly
+    # refused answerable questions (debugging.md 2.33), so Groq goes first.
+    llm_primary: Literal["gemini", "groq"] = "groq"
 
     # LLM client behaviour
     llm_timeout_seconds: float = 30.0
@@ -28,7 +32,7 @@ class Settings(BaseSettings):
 
     # Context building and relevance gate (PR 10)
     context_token_budget: int = 3000
-    relevance_threshold: float = 0.0
+    relevance_threshold: float = -8.0  # tuned on eval/questions.jsonl, see debugging.md 2.32
 
     # Sessions, cache and query log (PR 12)
     history_turns: int = 3
@@ -39,7 +43,7 @@ class Settings(BaseSettings):
 
     # Embeddings and vector search
     embed_provider: Literal["gemini", "local"] = "gemini"
-    embed_model: str = "text-embedding-004"
+    embed_model: str = "gemini-embedding-001"
     local_embed_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     embed_batch: int = 32
     index_version: str = "v1"
@@ -76,6 +80,9 @@ class Settings(BaseSettings):
     max_upload_mb: int = 20
     allowed_types: str = "pdf,html,htm,docx,txt"
     uploads_dir: Path = Path("data/uploads")
+
+    # Deployment (PR 18)
+    index_archive_url: str = ""
 
 
 @lru_cache(maxsize=1)

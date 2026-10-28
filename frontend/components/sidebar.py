@@ -25,9 +25,13 @@ def render_sidebar(api):
     with st.sidebar.form("upload"):
         f = st.file_uploader("File")
         supplier_id = st.text_input("Supplier ID")
-        doc_type = st.selectbox("Doc type", ["contract", "certificate", "price_schedule"])
+        doc_type = st.selectbox(
+            "Doc type", ["contract", "amendment", "certificate", "price_schedule"]
+        )
         submitted = st.form_submit_button("Upload")
-    if submitted and f is not None:
+    if submitted and f is not None and not supplier_id.strip():
+        st.sidebar.error("Enter a Supplier ID, for example helixa-cloud-systems.")
+    elif submitted and f is not None:
         try:
             res = api.upload(f.name, f.read(), supplier_id, doc_type)
             if res.get("duplicate"):

@@ -48,3 +48,41 @@ jobs:
       # test_corpus_targets is deselected until the corpus shortfall in
       # docs/data/data-sourcing.md section 14 is resolved
       - run: pytest -q -m "not targets"
+
+  clean-clone-ingest:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -e . -r requirements.txt
+      - name: Build the synthetic corpus and dry-run the ingest
+        run: |
+          python scripts/generate_synthetic.py --seed 42
+          python -m clausecheck.ingest --dry-run --manifest data/manifest.csv
+
+  eval-smoke:
+    if: github.event_name == 'push'
+    needs: [test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      # embeddings run on the runner (no API quota); it needs PyTorch, which requirements.txt omits
+      - run: pip install -e . -r requirements.txt sentence-transformers==6.2.0
+      - name: Ten tuning questions against the real APIs
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          EDGAR_USER_AGENT: ${{ secrets.EDGAR_USER_AGENT }}
+          EMBED_PROVIDER: local
+        run: |
+          python scripts/fetch_sources.py
+          python -m clausecheck.ingest --rebuild
+          python -m eval.run_eval --split tune --stage e2e --limit 10

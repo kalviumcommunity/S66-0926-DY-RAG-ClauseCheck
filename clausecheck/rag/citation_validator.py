@@ -4,6 +4,35 @@ from dataclasses import dataclass
 from clausecheck.rag.generator import REFUSAL_TEXT
 
 MARKER_RE = re.compile(r"\[C(\d+)\]")
+# A full stop after these does not end a sentence ("Verdant Polymers Pvt. Ltd. (the Supplier)")
+ABBREVIATIONS = (
+    "ltd.", "inc.", "corp.", "co.", "pvt.", "llc.", "plc.", "no.", "vs.", "etc.",
+    "e.g.", "i.e.", "st.", "mr.", "ms.", "dr.", "b.v.", "n.v.", "s.a.", "gmbh.", "ag.",
+)  # fmt: skip
+
+
+LOOKALIKE_MARKER_RE = re.compile(r"[\[【［(]\s*C\s*(\d+)\s*[\]】］)]")
+SPACE_VARIANTS = str.maketrans({" ": " ", " ": " ", " ": " ", "​": ""})
+
+
+def normalise_markers(text: str) -> str:
+    """Turn look-alike citation markers into `[C1]`.
+
+    Some models write 【C1】, ［C1］, [ C1 ] or put a narrow no-break space before the marker;
+    without this a correct, cited answer is counted as uncited and refused.
+    """
+    return LOOKALIKE_MARKER_RE.sub(r"[C\1]", text.translate(SPACE_VARIANTS))
+
+
+def _sentences(text: str) -> list[str]:
+    """Split on sentence-ending punctuation, but not after a common abbreviation."""
+    merged: list[str] = []
+    for part in re.split(r"(?<=[.!?])\s+", text):
+        if merged and merged[-1].lower().endswith(ABBREVIATIONS):
+            merged[-1] += " " + part
+        else:
+            merged.append(part)
+    return merged
 
 
 @dataclass
@@ -30,6 +59,7 @@ class ValidationResult:
 
 def validate(answer: str, marker_map: dict) -> ValidationResult:
     """Validate citation markers against the context's marker map."""
+    answer = normalise_markers(answer)
     stripped = answer.strip()
     if stripped == REFUSAL_TEXT:
         return ValidationResult(answer=stripped, citations=[], dropped=[], unsupported=False)
@@ -71,7 +101,7 @@ def validate(answer: str, marker_map: dict) -> ValidationResult:
 
     # Determine unsupported factual sentences.
     unsupported = False
-    for sentence in re.split(r"(?<=[.!?])\s+", answer):
+    for sentence in _sentences(answer):
         s = sentence.strip()
         if not s:
             continue

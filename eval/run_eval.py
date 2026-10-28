@@ -179,6 +179,7 @@ def main(argv: list[str] | None = None) -> int:
         "--agreement", metavar="PATH", help="hand-graded sample CSV for judge agreement"
     )
     parser.add_argument("--allow-heldout", action="store_true")
+    parser.add_argument("--limit", type=int, help="only the first N questions (quick smoke run)")
     args = parser.parse_args(argv)
 
     if args.agreement:
@@ -213,10 +214,6 @@ def main(argv: list[str] | None = None) -> int:
         f"recall@{args.k}={result['recall_at_k']:.3f} mrr={result['mrr']:.3f} -> {path}"
     )
     return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
 
 
 def _run_answer_for_threshold(settings, questions, retriever, reranker, generator, threshold):
@@ -406,7 +403,7 @@ def _run_e2e(args) -> int:
 
     judge_prompt = load_prompt("judge")
 
-    questions = load_questions(args.questions, split=args.split)
+    questions = load_questions(args.questions, split=args.split)[: args.limit]
     records = []
     grades = []
     cited_ids = []
@@ -524,4 +521,6 @@ def _run_agreement(args) -> int:
     )
     return 0
 
-    return 0
+
+if __name__ == "__main__":
+    raise SystemExit(main())

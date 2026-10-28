@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 
+from clausecheck.rag.hybrid_retriever import CLAUSE_REF_RE
 from clausecheck.rag.types import SearchHit
 
 DEFAULT_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
@@ -14,6 +15,18 @@ def _related(hit: SearchHit, expanded: SearchHit) -> bool:
     if not a.get("doc_id") or not b.get("doc_id"):
         return True
     return b["doc_id"] == a.get("parent_doc_id") or a["doc_id"] == b.get("parent_doc_id")
+
+
+def _amends(child: SearchHit, parent: SearchHit) -> bool:
+    """True if `child` is a clause of an amendment of `parent`'s document that names its clause."""
+    c, p = child.metadata, parent.metadata
+    if (
+        not c.get("parent_doc_id")
+        or c["parent_doc_id"] != p.get("doc_id")
+        or not p.get("clause_no")
+    ):
+        return False
+    return p["clause_no"] in CLAUSE_REF_RE.findall(child.text)
 
 
 class Reranker:
@@ -43,9 +56,18 @@ class Reranker:
         scores = self._score([(query, h.text) for h in hits])
         for hit, score in zip(hits, scores, strict=True):
             hit.rerank_score = float(score)
-        ranked = sorted((h for h in hits if not h.expanded), key=lambda h: -h.rerank_score)
+        ranked = sorted((h for h in hits if not h.expanded), key=lambda h: -(h.rerank_score or 0.0))
         kept = ranked[:top_n]
         out: list[SearchHit] = list(kept)
+        # A candidate that amends a kept clause (or is amended by one) must not be cut: the answer
+        # would quote the old term. Keep it right after its partner.
+        for other in ranked[top_n:]:
+            partner = next((k for k in kept if _amends(other, k) or _amends(k, other)), None)
+            if partner is not None:
+                pos = out.index(partner) + 1
+                while pos < len(out) and (out[pos].expanded or out[pos] not in kept):
+                    pos += 1
+                out.insert(pos, other)
         leftovers = []
         for exp in (h for h in hits if h.expanded):
             anchor = next((h for h in ranked if _related(h, exp)), None)

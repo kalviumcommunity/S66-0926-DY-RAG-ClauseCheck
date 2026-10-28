@@ -8,7 +8,7 @@ if str(ROOT) not in sys.path:
 
 import streamlit as st
 from components.api_client import ApiClient, ApiUnavailable
-from components.chat import StreamCollector, render_message
+from components.chat import StreamCollector, escape_dollars, render_message
 from components.insights import render_insights
 from components.sidebar import render_sidebar
 
@@ -58,7 +58,7 @@ with tab_chat:
         if msg.get("role") == "assistant":
             render_message(msg, api)
         else:
-            st.markdown(msg.get("content", ""))
+            st.markdown(escape_dollars(msg.get("content", "")))
 
     question = st.chat_input("Ask a question")
     if question:
@@ -68,7 +68,7 @@ with tab_chat:
             except ApiUnavailable:
                 st.session_state["session_id"] = None
         st.session_state["messages"].append({"role": "user", "content": question})
-        st.markdown(question)
+        st.markdown(escape_dollars(question))
 
         payload = {
             "question": question,
@@ -79,9 +79,13 @@ with tab_chat:
             from components.sse_client import stream_chat
 
             collector = StreamCollector(stream_chat(st.session_state["api_base_url"], payload))
-            assistant_text = st.write_stream(collector)
+            # stream into a placeholder, then clear it: render_message draws the final copy
+            holder = st.empty()
+            with holder.container():
+                st.write_stream(collector)
+            holder.empty()
+            # the collector keeps the raw text; the stream above showed an escaped copy
             msg = collector.message
-            msg["content"] = assistant_text if assistant_text else msg.get("content", "")
             st.session_state["messages"].append(msg)
             render_message(msg, api)
         except ApiUnavailable:

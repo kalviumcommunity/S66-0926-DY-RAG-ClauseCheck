@@ -58,10 +58,9 @@ def _load_html(path: Path) -> tuple[list[Page], list[Table]]:
     for tag in soup(REMOVED_HTML_TAGS):
         tag.decompose()
     tables = []
-    for element in soup.find_all("table"):
+    for element in soup.select("table"):
         rows = [
-            [_cell(c.get_text(" ")) for c in tr.find_all(["th", "td"])]
-            for tr in element.find_all("tr")
+            [_cell(c.get_text(" ")) for c in tr.select("th, td")] for tr in element.select("tr")
         ]
         table = _table(1, [r for r in rows if r])
         if table:

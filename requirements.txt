@@ -21,15 +21,12 @@ rapidfuzz==3.14.6
 #   pip install sentence-transformers==6.2.0
 
 # Frontend (PR 17)
-streamlit==1.40.0
+streamlit==1.56.0
 
 # API (PR 15)
 fastapi==0.115.0
 uvicorn[standard]==0.32.0
-httpx==0.27.2
-python-multipart==0.0.12
-uvicorn[standard]==0.32.0
-httpx==0.27.2
+httpx==0.28.1
 python-multipart==0.0.12
 
 # Dev
